@@ -1,0 +1,34 @@
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+indent_style = space
+indent_size = 4
+trim_trailing_whitespace = true
+
+[*.{json,yml,yaml,props,targets,csproj,slnx}]
+indent_size = 2
+
+[*.md]
+trim_trailing_whitespace = false
+
+[*.cs]
+csharp_style_namespace_declarations = file_scoped:error
+csharp_prefer_braces = true:error
+csharp_new_line_before_open_brace = all
+csharp_new_line_before_else = true
+csharp_new_line_before_catch = true
+csharp_new_line_before_finally = true
+csharp_style_var_when_type_is_apparent = true:suggestion
+csharp_style_prefer_primary_constructors = true:suggestion
+dotnet_style_prefer_conditional_expression_over_return = false:none
+dotnet_diagnostic.IDE0011.severity = error   # braces
+dotnet_diagnostic.IDE0161.severity = error   # file-scoped namespace
+dotnet_diagnostic.CA1848.severity = none     # LoggerMessage delegates: not worth it at this size
+dotnet_diagnostic.CA1062.severity = none
+
+[tests/**.cs]
+dotnet_diagnostic.CA1707.severity = none     # Method_Scenario_Expected test names
+dotnet_diagnostic.CA2007.severity = none

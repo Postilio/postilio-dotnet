@@ -1,0 +1,12 @@
+bin/
+obj/
+artifacts/
+TestResults/
+StrykerOutput/
+*.user
+.idea/
+.vs/
+.vscode/
+*.nupkg
+*.snupkg
+.env
