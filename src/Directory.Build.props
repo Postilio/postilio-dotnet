@@ -9,6 +9,7 @@
     <PackageProjectUrl>https://github.com/Postilio/postilio-dotnet</PackageProjectUrl>
     <RepositoryUrl>https://github.com/Postilio/postilio-dotnet</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <PackageTags>postilio;email;transactional-email;smtp;webhooks</PackageTags>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>

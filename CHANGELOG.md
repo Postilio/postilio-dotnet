@@ -28,3 +28,4 @@ First version, against the alpha of the Postilio API (`/v1`, OpenAPI fingerprint
   `WebhookEvent.Parse`.
 - `Postilio.Client.AspNetCore`: `IEmailSender<TUser>` and the Identity UI's `IEmailSender` for ASP.NET Core Identity.
 - Targets .NET 8 and .NET 10; trimming- and native-AOT-compatible (System.Text.Json source generation).
+- MIT license.

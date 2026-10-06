@@ -34,6 +34,8 @@ for package, dependencies in expected.items():
                 problems.append(f"{package} {target}: dependencies {sorted(found)}, expected {sorted(dependencies)}")
         if "README.md" not in names or "<readme>README.md</readme>" not in nuspec:
             problems.append(f"{package}: no readme")
+        if '<license type="expression">MIT</license>' not in nuspec:
+            problems.append(f"{package}: no MIT license expression")
         for tag in ("description", "repository", "projectUrl"):
             if f"<{tag}" not in nuspec:
                 problems.append(f"{package}: no <{tag}> in the nuspec")

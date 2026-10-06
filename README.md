@@ -230,4 +230,4 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) and [SECURITY.md](SECURITY.md).
 
 ## License
 
-Not chosen yet.
+[MIT](LICENSE).
