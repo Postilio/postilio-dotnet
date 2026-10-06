@@ -62,6 +62,23 @@ public sealed class PostilioEmailSenderTests
     }
 
     [Fact]
+    public async Task SendEmailAsync_IdentityUiSender_SendsTheMessageAsGiven()
+    {
+        var services = new ServiceCollection();
+        services.AddPostilio(o => o.ApiKey = "pk_test_abcdefghijklmnopqrstuvwxyz012345").ConfigurePrimaryHttpMessageHandler(() => _http);
+        services.AddPostilioEmailSender<IdentityUser>(o => o.From = "no-reply@mail.example.com");
+        var sender = services.BuildServiceProvider().GetRequiredService<Microsoft.AspNetCore.Identity.UI.Services.IEmailSender>();
+        _http.Answer(HttpStatusCode.Accepted, Sent);
+
+        await sender.SendEmailAsync("ada@example.com", "Confirm your email", "<p>Confirm <a href='https://example.com/c'>here</a>.</p>");
+
+        var body = JsonNode.Parse(_http.Requests[0].Body ?? string.Empty);
+        Assert.Equal("Confirm your email", (string?)body?["subject"]);
+        Assert.Equal("<p>Confirm <a href='https://example.com/c'>here</a>.</p>", (string?)body?["html"]);
+        Assert.Equal("identity", (string?)body?["tag"]);
+    }
+
+    [Fact]
     public void AddPostilioEmailSender_NoFrom_FailsWhenTheSenderIsResolved()
     {
         Assert.Throws<OptionsValidationException>(() => Sender(_ => { }));

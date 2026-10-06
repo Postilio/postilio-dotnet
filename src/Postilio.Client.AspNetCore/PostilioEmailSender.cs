@@ -5,11 +5,13 @@ using Microsoft.Extensions.Options;
 namespace Postilio.AspNetCore;
 
 /// <summary>
-/// Sends ASP.NET Core Identity's emails through Postilio, with Identity's own wording, as HTML and plain text.
+/// Sends ASP.NET Core Identity's emails through Postilio: as <see cref="IEmailSender{TUser}"/> with Identity's own
+/// wording, as HTML and plain text, and as the Identity UI's <see cref="Microsoft.AspNetCore.Identity.UI.Services.IEmailSender"/>.
 /// Register it with <c>services.AddPostilioEmailSender&lt;TUser&gt;(...)</c>.
 /// </summary>
 /// <typeparam name="TUser">The app's user type.</typeparam>
-public sealed class PostilioEmailSender<TUser>(PostilioClient client, IOptions<PostilioEmailSenderOptions> options) : IEmailSender<TUser>
+public sealed class PostilioEmailSender<TUser>(PostilioClient client, IOptions<PostilioEmailSenderOptions> options)
+    : IEmailSender<TUser>, Microsoft.AspNetCore.Identity.UI.Services.IEmailSender
     where TUser : class
 {
     // Read here, so a missing sender address fails when the sender is resolved rather than at the first email.
@@ -33,8 +35,11 @@ public sealed class PostilioEmailSender<TUser>(PostilioClient client, IOptions<P
             $"Please reset your password using the following code: {WebUtility.HtmlEncode(resetCode)}",
             $"Please reset your password using the following code: {resetCode}");
 
+    /// <inheritdoc />
+    public Task SendEmailAsync(string email, string subject, string htmlMessage) => SendAsync(email, subject, htmlMessage, null);
+
     // Identity passes links already HTML-encoded, so they go into the HTML as they are and are decoded for the text.
-    private Task<SendEmailResponse> SendAsync(string email, string subject, string html, string text) =>
+    private Task<SendEmailResponse> SendAsync(string email, string subject, string html, string? text) =>
         client.SendEmailAsync(new SendEmailRequest
         {
             From = _options.From,
