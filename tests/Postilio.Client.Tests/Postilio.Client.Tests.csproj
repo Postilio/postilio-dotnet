@@ -8,7 +8,7 @@
     <Using Include="Xunit" />
   </ItemGroup>
   <ItemGroup>
-    <None Include="..\..\spec\openapi-v1.json" Link="spec\openapi-v1.json" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\..\spec\openapi-v1.*" LinkBase="spec" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\src\Postilio.Client\Postilio.Client.csproj" />
