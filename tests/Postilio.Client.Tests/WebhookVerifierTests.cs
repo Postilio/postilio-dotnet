@@ -67,5 +67,29 @@ public sealed class WebhookVerifierTests
         Assert.Throws<ArgumentException>(() => new WebhookVerifier(secret));
     }
 
+    [Fact]
+    public void Parse_DocsExample_IsReadIntoTypedProperties()
+    {
+        var bounced = WebhookEvent.Parse("""
+            {
+              "type": "email.bounced.v1",
+              "timestamp": "2026-10-03T14:07:45.102+00:00",
+              "data": {
+                "emailId": "0199a7c4-5a1e-7d2b-9c41-6f3e0b8a2d17", "projectId": "0199a1b2-0000-7000-8000-000000000001",
+                "to": "ada.lovelace@example.com", "tag": "sign-in", "test": false, "event": "bounced",
+                "occurredAt": "2026-10-03T14:07:45.102+00:00", "attempt": 1, "smtpCode": 550, "enhancedCode": "5.1.1",
+                "classification": "InvalidRecipient", "response": "550 5.1.1 The email account that you tried to reach does not exist",
+                "remoteHost": "mx.example.com", "aFieldAddedLater": true
+              }
+            }
+            """);
+
+        Assert.Equal("email.bounced.v1", bounced.Type);
+        Assert.Equal(Guid.Parse("0199a7c4-5a1e-7d2b-9c41-6f3e0b8a2d17"), bounced.Data.EmailId);
+        Assert.Equal(EmailStatuses.Bounced, bounced.Data.Event);
+        Assert.Equal(550, bounced.Data.SmtpCode);
+        Assert.Equal(new DateTimeOffset(2026, 10, 3, 14, 7, 45, 102, TimeSpan.Zero), bounced.Data.OccurredAt);
+    }
+
     private static FakeTimeProvider ClockAt(long unixSeconds) => new(DateTimeOffset.FromUnixTimeSeconds(unixSeconds));
 }
