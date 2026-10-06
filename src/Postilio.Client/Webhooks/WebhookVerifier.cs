@@ -45,9 +45,10 @@ public sealed class WebhookVerifier
     public bool Verify(string? id, string? timestamp, string? signatureHeader, string body)
     {
         ArgumentNullException.ThrowIfNull(body);
-        if (string.IsNullOrEmpty(id) || string.IsNullOrEmpty(signatureHeader)
+        if (string.IsNullOrEmpty(signatureHeader)
             || !long.TryParse(timestamp, NumberStyles.None, CultureInfo.InvariantCulture, out var seconds)
-            || (_time.GetUtcNow() - DateTimeOffset.FromUnixTimeSeconds(seconds)).Duration() > Tolerance)
+            // In seconds, not as a DateTimeOffset: a forged timestamp beyond year 9999 must be refused, not throw.
+            || Math.Abs(_time.GetUtcNow().ToUnixTimeSeconds() - seconds) > Tolerance.TotalSeconds)
         {
             return false;
         }
