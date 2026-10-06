@@ -34,13 +34,14 @@ both packages to nuget.org through trusted publishing, and creates the GitHub re
    ```
 
 5. `release.yml` checks that the tag matches `<Version>`, runs `./build.sh`, pushes the packages (symbols included) and
-   creates the GitHub release, marked as a pre-release for a version with a suffix. Check the package pages afterwards:
+   creates the GitHub release, marked as a pre-release for a version with a suffix. A release made by hand in GitHub
+   for the tag works too: the workflow then adds the packages to it. Check the package pages afterwards:
    the owner must be the organization `Postilio`.
 6. After the first release: set `<PackageValidationBaselineVersion>` in `src/Directory.Build.props` to the released
    version, so `dotnet pack` fails on an accidental breaking change from then on.
 
-A failed push can be run again from the Actions tab; nuget.org refuses a version that already exists, so a version is
-never published twice.
+A failed run can be run again from the Actions tab: packages already on nuget.org are skipped, and a version is never
+published twice. New packages take a while (validation and indexing) before their page on nuget.org shows.
 
 ## Signing
 

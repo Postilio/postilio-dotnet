@@ -38,8 +38,14 @@ jobs:
         with:
           user: ${{ secrets.NUGET_USER }}
       - name: Push the packages
-        run: dotnet nuget push "artifacts/packages/$VERSION/*.nupkg" --api-key "${{ steps.login.outputs.NUGET_API_KEY }}" --source https://api.nuget.org/v3/index.json
-      - name: Create the GitHub release
-        run: gh release create "$GITHUB_REF_NAME" artifacts/packages/"$VERSION"/*.nupkg --verify-tag --generate-notes $([[ "$VERSION" == *-* ]] && echo --prerelease)
+        # --skip-duplicate makes a re-run safe once a package of this version is on nuget.org.
+        run: dotnet nuget push "artifacts/packages/$VERSION/*.nupkg" --api-key "${{ steps.login.outputs.NUGET_API_KEY }}" --source https://api.nuget.org/v3/index.json --skip-duplicate
+      - name: Create the GitHub release, or add the packages to one made by hand
+        run: |
+          if gh release view "$GITHUB_REF_NAME" > /dev/null 2>&1; then
+            gh release upload "$GITHUB_REF_NAME" artifacts/packages/"$VERSION"/*.nupkg --clobber
+          else
+            gh release create "$GITHUB_REF_NAME" artifacts/packages/"$VERSION"/*.nupkg --verify-tag --generate-notes $([[ "$VERSION" == *-* ]] && echo --prerelease)
+          fi
         env:
           GH_TOKEN: ${{ github.token }}
