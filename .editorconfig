@@ -32,3 +32,4 @@ dotnet_diagnostic.CA1062.severity = none
 [tests/**.cs]
 dotnet_diagnostic.CA1707.severity = none     # Method_Scenario_Expected test names
 dotnet_diagnostic.CA2007.severity = none
+dotnet_diagnostic.CA1001.severity = none     # xUnit creates a class per test; stubs need no disposal

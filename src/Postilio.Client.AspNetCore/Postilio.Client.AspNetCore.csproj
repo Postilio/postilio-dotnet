@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <RootNamespace>Postilio.AspNetCore</RootNamespace>
+    <Description>Sends ASP.NET Core Identity email (confirmation links, password resets) through Postilio.</Description>
+    <PackageTags>$(PackageTags);aspnetcore;identity</PackageTags>
+  </PropertyGroup>
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Postilio.Client\Postilio.Client.csproj" />
+  </ItemGroup>
+</Project>
