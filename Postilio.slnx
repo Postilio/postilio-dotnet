@@ -1,0 +1,9 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Postilio.Client/Postilio.Client.csproj" />
+    <Project Path="src/Postilio.Client.AspNetCore/Postilio.Client.AspNetCore.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Postilio.Client.Tests/Postilio.Client.Tests.csproj" />
+  </Folder>
+</Solution>
