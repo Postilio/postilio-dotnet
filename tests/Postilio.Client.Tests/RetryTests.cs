@@ -13,12 +13,12 @@ public sealed class RetryTests
     [Fact]
     public async Task RateLimited_RetryAfterWithinTheMaximum_WaitsThatLongAndRetriesAnyMethod()
     {
-        _http.Answer(HttpStatusCode.TooManyRequests, """{"error":"too_many_checks"}""", configure: RetryAfter(20)).Answer(HttpStatusCode.OK, Domain);
+        _http.Answer(HttpStatusCode.TooManyRequests, """{"error":"too_many_checks"}""", configure: RetryAfter(30)).Answer(HttpStatusCode.OK, Domain);
 
         await Client().CheckDomainAsync(Guid.NewGuid(), TestContext.Current.CancellationToken);
 
         Assert.Equal(2, _http.Requests.Count);
-        Assert.Equal([TimeSpan.FromSeconds(20)], _delays);
+        Assert.Equal([TimeSpan.FromSeconds(30)], _delays);
     }
 
     [Fact]
@@ -104,13 +104,13 @@ public sealed class RetryTests
     }
 
     [Fact]
-    public async Task ConnectionFailure_Get_IsRetried()
+    public async Task ConnectionFailure_Get_IsRetriedUpToMaxRetries()
     {
-        _http.Fail().Answer(HttpStatusCode.OK, Domain);
+        _http.Fail().Fail().Fail().Answer(HttpStatusCode.OK, Domain);
 
-        await Client().GetDomainAsync(Guid.NewGuid(), TestContext.Current.CancellationToken);
+        await Assert.ThrowsAsync<HttpRequestException>(() => Client().GetDomainAsync(Guid.NewGuid(), TestContext.Current.CancellationToken));
 
-        Assert.Equal(2, _http.Requests.Count);
+        Assert.Equal(3, _http.Requests.Count);
     }
 
     [Fact]
