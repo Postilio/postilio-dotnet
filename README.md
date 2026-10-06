@@ -64,9 +64,10 @@ builder.Services.AddPostilio(builder.Configuration.GetSection("Postilio"));
 app.MapPost("/signup", async (PostilioClient postilio, CancellationToken ct) => { /* … */ });
 ```
 
-`AddPostilio` registers `PostilioClient` as a typed client of `IHttpClientFactory`, checks the key when the app
-starts, and redacts the `Authorization` header from the factory's logs: the key is never logged. It returns the
-`IHttpClientBuilder`, so you can add your own handlers or set a timeout.
+`AddPostilio` registers `PostilioClient` as a typed client of `IHttpClientFactory`, checks the settings when the app
+starts, and redacts the `Authorization` header from the factory's logs: the key is never logged. A reloaded
+configuration section, such as a rotated key, applies to clients resolved after the reload. It returns the
+`IHttpClientBuilder`, for your own handlers or a timeout (see [Retries](#retries)).
 
 ## Sending safely twice: idempotency
 
@@ -74,7 +75,7 @@ A request can time out after Postilio accepted it. `SendEmailAsync` therefore al
 makes per call, so its own retries never send twice. Pass your own key to be safe across restarts and queues too:
 
 ```csharp
-await postilio.SendEmailAsync(receipt, idempotencyKey: $"order-{order.Id}-receipt", ct);
+await postilio.SendEmailAsync(receipt, $"order-{order.Id}-receipt", ct);
 ```
 
 Within 24 hours, the same key with the same request answers as the first time and sends nothing; the same key with
@@ -101,7 +102,7 @@ do not know by its status:
 ```csharp
 try
 {
-    await postilio.SendEmailAsync(message, cancellationToken: ct);
+    await postilio.SendEmailAsync(message, ct);
 }
 catch (PostilioUnprocessableException e) when (e.ErrorCode == PostilioErrorCodes.UnverifiedSenderDomain)
 {
@@ -122,7 +123,12 @@ The client retries, at most `MaxRetries` times (2 by default):
 - a **connection failure** or a **408, 500, 502, 503 or 504** only when sending again cannot do anything twice: a `GET`,
   or a send, which carries an `Idempotency-Key`. Creating, changing and deleting are never retried on these.
 
-Waits grow from half a second, with some random spread. Set `MaxRetries = 0` to turn retries off.
+Waits grow from half a second, with some random spread, and never exceed `MaxRetryDelay`. Set `MaxRetries = 0` to turn
+retries off, for instance when you prefer your own resilience handler; do not add one on top of these retries
+(`AddStandardResilienceHandler` would also retry creating and deleting).
+
+`HttpClient.Timeout` (100 seconds by default) covers a whole call, its retries and waits included, and throws a
+`TaskCanceledException` when it runs out. Set it with `AddPostilio(...).ConfigureHttpClient(c => c.Timeout = ...)`.
 
 ## Domains, suppressions and webhooks
 
@@ -191,16 +197,9 @@ builder.Services.AddPostilio(builder.Configuration.GetSection("Postilio"));
 builder.Services.AddPostilioEmailSender<ApplicationUser>(o => o.From = "Acme <no-reply@mail.example.com>");
 ```
 
-Apps on the older, non-generic `Microsoft.AspNetCore.Identity.UI.Services.IEmailSender` (the scaffolded Identity UI)
-can call the client from their own implementation:
-
-```csharp
-public sealed class PostilioUiEmailSender(PostilioClient postilio) : IEmailSender
-{
-    public Task SendEmailAsync(string email, string subject, string htmlMessage) =>
-        postilio.SendEmailAsync(new SendEmailRequest { From = "Acme <no-reply@mail.example.com>", To = [email], Subject = subject, Html = htmlMessage });
-}
-```
+The same registration serves the Identity UI's non-generic `Microsoft.AspNetCore.Identity.UI.Services.IEmailSender`
+(scaffolded Identity pages), which sends the HTML it is given. Want your own wording? Implement either interface
+yourself with a few lines around `PostilioClient.SendEmailAsync`.
 
 ## Replacing SmtpClient
 
@@ -209,7 +208,7 @@ you at once whether Postilio accepted the message and why not, and never sends a
 
 ```csharp
 // before: smtp.SendMailAsync(new MailMessage(from, to, subject, body) { IsBodyHtml = true });
-await postilio.SendEmailAsync(new SendEmailRequest { From = from, To = [to], Subject = subject, Html = body }, cancellationToken: ct);
+await postilio.SendEmailAsync(new SendEmailRequest { From = from, To = [to], Subject = subject, Html = body }, ct);
 ```
 
 SMTP stays available for software that only speaks SMTP: see the [sending guide](https://docs.postilio.eu/sending.html).
