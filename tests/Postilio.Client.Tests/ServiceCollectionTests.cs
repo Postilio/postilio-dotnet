@@ -53,18 +53,62 @@ public sealed class ServiceCollectionTests
         Assert.DoesNotContain(_logs.Lines, line => line.Contains(ApiKey, StringComparison.Ordinal));
     }
 
-    [Theory]
-    [InlineData("")]
-    [InlineData("whsec_MfKQ9r8GKYqrTwjUPD8ILPZIo2LaLaSw")]
-    public void AddPostilio_NoApiKey_FailsWhenTheClientIsResolved(string apiKey)
+    [Fact]
+    public async Task AddPostilio_CalledTwice_RetriesOnlyOnce()
     {
         var services = new ServiceCollection();
-        services.AddPostilio(o => o.ApiKey = apiKey);
+        services.AddPostilio(o => o.ApiKey = ApiKey);
+        services.AddPostilio(o => o.ApiKey = ApiKey).ConfigurePrimaryHttpMessageHandler(() => _http);
+        _http.Answer(HttpStatusCode.ServiceUnavailable).Answer(HttpStatusCode.ServiceUnavailable).Answer(HttpStatusCode.ServiceUnavailable)
+            .Answer(HttpStatusCode.OK, """{"data":[]}""");
+        using var provider = services.BuildServiceProvider();
+
+        await Assert.ThrowsAsync<PostilioServerException>(() => provider.GetRequiredService<PostilioClient>().ListDomainsAsync(TestContext.Current.CancellationToken));
+
+        Assert.Equal(3, _http.Requests.Count);
+    }
+
+    [Fact]
+    public async Task AddPostilio_ConfigurationReloaded_NewClientsUseTheNewKey()
+    {
+        const string rotated = "pk_test_rotatedrotatedrotatedrotated0123";
+        var configuration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?> { ["Postilio:ApiKey"] = ApiKey }).Build();
+        var services = new ServiceCollection();
+        services.AddPostilio(configuration.GetSection("Postilio")).ConfigurePrimaryHttpMessageHandler(() => _http);
+        _http.Answer(HttpStatusCode.OK, """{"data":[]}""");
+        using var provider = services.BuildServiceProvider();
+        provider.GetRequiredService<PostilioClient>();
+
+        configuration["Postilio:ApiKey"] = rotated;
+        configuration.Reload();
+        await provider.GetRequiredService<PostilioClient>().ListDomainsAsync(TestContext.Current.CancellationToken);
+
+        Assert.Equal($"Bearer {rotated}", _http.Requests[0].Request.Headers.Authorization?.ToString());
+    }
+
+    public static TheoryData<string, int, int, string> InvalidOptions() => new()
+    {
+        { string.Empty, 2, 30, "ApiKey" },
+        { "whsec_MfKQ9r8GKYqrTwjUPD8ILPZIo2LaLaSw", 2, 30, "ApiKey" },
+        { ApiKey, -1, 30, "MaxRetries" },
+        { ApiKey, 2, -1, "MaxRetryDelay" },
+    };
+
+    [Theory, MemberData(nameof(InvalidOptions))]
+    public void AddPostilio_InvalidOptions_FailWhenTheClientIsResolved(string apiKey, int maxRetries, int maxRetryDelaySeconds, string setting)
+    {
+        var services = new ServiceCollection();
+        services.AddPostilio(o =>
+        {
+            o.ApiKey = apiKey;
+            o.MaxRetries = maxRetries;
+            o.MaxRetryDelay = TimeSpan.FromSeconds(maxRetryDelaySeconds);
+        });
         using var provider = services.BuildServiceProvider();
 
         var error = Assert.Throws<OptionsValidationException>(() => provider.GetRequiredService<PostilioClient>());
 
-        Assert.Contains("ApiKey", error.Message, StringComparison.Ordinal);
+        Assert.Contains(setting, error.Message, StringComparison.Ordinal);
     }
 
     private sealed class LogCollector : ILoggerProvider, ILogger

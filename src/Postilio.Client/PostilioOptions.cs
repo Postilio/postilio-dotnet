@@ -1,6 +1,6 @@
 namespace Postilio;
 
-/// <summary>Settings of a <see cref="PostilioClient"/>. Bind them from the <c>Postilio</c> configuration section, never from code.</summary>
+/// <summary>Settings of a <see cref="PostilioClient"/>, usually bound from the <c>Postilio</c> configuration section.</summary>
 public sealed class PostilioOptions
 {
     /// <summary>The API key, <c>pk_live_…</c> or <c>pk_test_…</c>. Keep it in a secret store; the client never logs it.</summary>
@@ -20,4 +20,11 @@ public sealed class PostilioOptions
 
     /// <inheritdoc />
     public override string ToString() => $"PostilioOptions {{ BaseAddress = {BaseAddress}, MaxRetries = {MaxRetries}, MaxRetryDelay = {MaxRetryDelay} }}";
+
+    internal string? Problem() =>
+        !ApiKey.StartsWith("pk_", StringComparison.Ordinal) ? "PostilioOptions.ApiKey must be an API key: pk_live_… or pk_test_…."
+        : BaseAddress is not { IsAbsoluteUri: true } ? "PostilioOptions.BaseAddress must be an absolute URI."
+        : MaxRetries < 0 ? "PostilioOptions.MaxRetries must be 0 or more."
+        : MaxRetryDelay < TimeSpan.Zero ? "PostilioOptions.MaxRetryDelay must be zero or more."
+        : null;
 }

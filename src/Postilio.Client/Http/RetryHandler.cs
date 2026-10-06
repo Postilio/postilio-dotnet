@@ -23,10 +23,10 @@ internal sealed class RetryHandler(Func<PostilioOptions> options, Func<TimeSpan,
             }
             catch (HttpRequestException) when (attempt < settings.MaxRetries && IsReplayable(request))
             {
-                await delay(Backoff(attempt), cancellationToken).ConfigureAwait(false);
+                await delay(Backoff(attempt, settings.MaxRetryDelay), cancellationToken).ConfigureAwait(false);
                 continue;
             }
-            if (attempt >= settings.MaxRetries || WaitBeforeRetry(request, response, attempt) is not { } wait || wait > settings.MaxRetryDelay)
+            if (attempt >= settings.MaxRetries || WaitBeforeRetry(request, response, attempt, settings.MaxRetryDelay) is not { } wait || wait > settings.MaxRetryDelay)
             {
                 return response;
             }
@@ -35,7 +35,7 @@ internal sealed class RetryHandler(Func<PostilioOptions> options, Func<TimeSpan,
         }
     }
 
-    private static TimeSpan? WaitBeforeRetry(HttpRequestMessage request, HttpResponseMessage response, int attempt)
+    private static TimeSpan? WaitBeforeRetry(HttpRequestMessage request, HttpResponseMessage response, int attempt, TimeSpan maxDelay)
     {
         var retryable = response.StatusCode switch
         {
@@ -44,7 +44,7 @@ internal sealed class RetryHandler(Func<PostilioOptions> options, Func<TimeSpan,
                 or HttpStatusCode.ServiceUnavailable or HttpStatusCode.GatewayTimeout => IsReplayable(request),
             _ => false,
         };
-        return retryable ? RetryAfter(response) ?? Backoff(attempt) : null;
+        return retryable ? RetryAfter(response) ?? Backoff(attempt, maxDelay) : null;
     }
 
     internal static TimeSpan? RetryAfter(HttpResponseMessage response) => response.Headers.RetryAfter switch
@@ -57,7 +57,10 @@ internal sealed class RetryHandler(Func<PostilioOptions> options, Func<TimeSpan,
     private static bool IsReplayable(HttpRequestMessage request) =>
         request.Method == HttpMethod.Get || (request.Method == HttpMethod.Post && request.Headers.Contains(IdempotencyKeyHeader));
 
-    // 0.5 s, 1 s, 2 s, … with ±20% spread so clients that failed together do not retry together.
-    private static TimeSpan Backoff(int attempt) =>
-        FirstBackoff * Math.Pow(2, attempt) * (0.8 + (Random.Shared.NextDouble() * 0.4));
+    // 0.5 s, 1 s, 2 s, … up to the maximum, with ±20% spread so clients that failed together do not retry together.
+    private static TimeSpan Backoff(int attempt, TimeSpan maxDelay)
+    {
+        var wait = FirstBackoff * Math.Pow(2, attempt) * (0.8 + (Random.Shared.NextDouble() * 0.4));
+        return wait < maxDelay ? wait : maxDelay;
+    }
 }

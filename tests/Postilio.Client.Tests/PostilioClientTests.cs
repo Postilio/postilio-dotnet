@@ -21,12 +21,13 @@ public sealed class PostilioClientTests
             Subject = "Your invoice",
             Text = "See the attachment.",
             Attachments = [new EmailAttachment { FileName = "invoice.pdf", ContentType = "application/pdf", Content = [1, 2, 3] }],
-        }, cancellationToken: TestContext.Current.CancellationToken);
+        }, TestContext.Current.CancellationToken);
 
         var (request, body) = Assert.Single(_http.Requests);
         Assert.Equal(HttpMethod.Post, request.Method);
         Assert.Equal("https://api.postilio.eu/v1/emails", request.RequestUri?.ToString());
         Assert.Equal($"Bearer {ApiKey}", request.Headers.Authorization?.ToString());
+        Assert.StartsWith("postilio-dotnet/", request.Headers.UserAgent.ToString(), StringComparison.Ordinal);
         Assert.Equal("application/json", request.Content?.Headers.ContentType?.MediaType);
         Assert.True(JsonNode.DeepEquals(JsonNode.Parse("""
             {
@@ -46,8 +47,8 @@ public sealed class PostilioClientTests
         _http.Answer(HttpStatusCode.Accepted, """{"ids":[],"suppressed":[]}""").Answer(HttpStatusCode.Accepted, """{"ids":[],"suppressed":[]}""");
         var client = Client();
 
-        await client.SendEmailAsync(Welcome(), cancellationToken: TestContext.Current.CancellationToken);
-        await client.SendEmailAsync(Welcome(), cancellationToken: TestContext.Current.CancellationToken);
+        await client.SendEmailAsync(Welcome(), TestContext.Current.CancellationToken);
+        await client.SendEmailAsync(Welcome(), TestContext.Current.CancellationToken);
 
         var keys = _http.Requests.Select(r => Assert.Single(r.Request.Headers.GetValues("Idempotency-Key"))).ToArray();
         Assert.All(keys, key => Assert.True(Guid.TryParse(key, out _), key));
@@ -161,7 +162,7 @@ public sealed class PostilioClientTests
     {
         _http.Answer(HttpStatusCode.TooManyRequests, """{"error":"sandbox_daily_limit_reached"}""", configure: r => r.Headers.TryAddWithoutValidation("Retry-After", "3600"));
 
-        var error = await Assert.ThrowsAsync<PostilioRateLimitException>(() => Client().SendEmailAsync(Welcome(), cancellationToken: TestContext.Current.CancellationToken));
+        var error = await Assert.ThrowsAsync<PostilioRateLimitException>(() => Client().SendEmailAsync(Welcome(), TestContext.Current.CancellationToken));
 
         Assert.Equal(TimeSpan.FromHours(1), error.RetryAfter);
     }
@@ -175,7 +176,7 @@ public sealed class PostilioClientTests
              "traceId":"00-4d6a1c9b71484cc59ac852cda603b93c-28de36d1c118bc08-00"}
             """, "application/problem+json");
 
-        var error = await Assert.ThrowsAsync<PostilioValidationException>(() => Client().SendEmailAsync(Welcome(), cancellationToken: TestContext.Current.CancellationToken));
+        var error = await Assert.ThrowsAsync<PostilioValidationException>(() => Client().SendEmailAsync(Welcome(), TestContext.Current.CancellationToken));
 
         Assert.Equal(["Between 1 and 50 recipients are required."], error.Errors["to"]);
         Assert.Equal(["Either text or html is required."], error.Errors["body"]);
@@ -187,7 +188,7 @@ public sealed class PostilioClientTests
     {
         _http.Answer(HttpStatusCode.BadRequest);
 
-        var error = await Assert.ThrowsAsync<PostilioValidationException>(() => Client().SendEmailAsync(Welcome(), cancellationToken: TestContext.Current.CancellationToken));
+        var error = await Assert.ThrowsAsync<PostilioValidationException>(() => Client().SendEmailAsync(Welcome(), TestContext.Current.CancellationToken));
 
         Assert.Empty(error.Errors);
     }
@@ -200,6 +201,31 @@ public sealed class PostilioClientTests
         var error = await Assert.ThrowsAsync<PostilioServerException>(() => NoRetryClient().GetEmailAsync(EmailId, TestContext.Current.CancellationToken));
 
         Assert.Equal("00-abc-def-00", error.TraceId);
+    }
+
+    [Fact]
+    public async Task Constructor_HttpClientOfTheCaller_IsLeftAsItWas()
+    {
+        using var shared = new HttpClient(_http, disposeHandler: false) { BaseAddress = new Uri("https://other.example.com/") };
+        _http.Answer(HttpStatusCode.OK, """{"data":[]}""");
+
+        await new PostilioClient(shared, new PostilioOptions { ApiKey = ApiKey }).ListDomainsAsync(TestContext.Current.CancellationToken);
+
+        Assert.Equal(new Uri("https://other.example.com/"), shared.BaseAddress);
+        Assert.Null(shared.DefaultRequestHeaders.Authorization);
+        Assert.Equal("https://api.postilio.eu/v1/domains", _http.Requests[0].Request.RequestUri?.ToString());
+        Assert.Equal($"Bearer {ApiKey}", _http.Requests[0].Request.Headers.Authorization?.ToString());
+    }
+
+    [Fact]
+    public async Task Request_SuccessWithoutJson_ThrowsAPostilioException()
+    {
+        _http.Answer(HttpStatusCode.OK, "<html>proxy</html>", "text/html");
+
+        var error = await Assert.ThrowsAsync<PostilioException>(() => Client().GetEmailAsync(EmailId, TestContext.Current.CancellationToken));
+
+        Assert.Equal(HttpStatusCode.OK, error.StatusCode);
+        Assert.IsType<System.Text.Json.JsonException>(error.InnerException);
     }
 
     [Fact]

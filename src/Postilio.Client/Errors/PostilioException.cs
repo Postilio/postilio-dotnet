@@ -8,9 +8,9 @@ namespace Postilio;
 /// </summary>
 public class PostilioException : Exception
 {
-    /// <summary>Creates the exception for an error answer.</summary>
-    public PostilioException(string message, HttpStatusCode statusCode, string? errorCode = null, string? traceId = null, TimeSpan? retryAfter = null)
-        : base(message)
+    /// <summary>Creates the exception for an error answer, or for an answer that could not be read.</summary>
+    public PostilioException(string message, HttpStatusCode statusCode, string? errorCode = null, string? traceId = null, TimeSpan? retryAfter = null, Exception? innerException = null)
+        : base(message, innerException)
     {
         StatusCode = statusCode;
         ErrorCode = errorCode;

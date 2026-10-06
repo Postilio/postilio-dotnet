@@ -2,6 +2,7 @@ using System.Globalization;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Options;
 using Postilio;
+using Postilio.DependencyInjection;
 using Postilio.Http;
 
 namespace Microsoft.Extensions.DependencyInjection;
@@ -17,18 +18,23 @@ public static class PostilioServiceCollectionExtensions
     {
         ArgumentNullException.ThrowIfNull(services);
         ArgumentNullException.ThrowIfNull(configure);
-        services.AddOptions<PostilioOptions>()
-            .Configure(configure)
-            .Validate(o => o.ApiKey.StartsWith("pk_", StringComparison.Ordinal), "PostilioOptions.ApiKey must be an API key: pk_live_… or pk_test_….")
-            .ValidateOnStart();
-        return services
-            .AddHttpClient(nameof(PostilioClient))
+        services.AddOptions<PostilioOptions>().Configure(configure).ValidateOnStart();
+        var builder = services.AddHttpClient(nameof(PostilioClient));
+        // A second call only adds settings: a second retry handler would multiply the attempts.
+        if (services.Any(s => s.ServiceType == typeof(IValidateOptions<PostilioOptions>)))
+        {
+            return builder;
+        }
+        services.AddSingleton<IValidateOptions<PostilioOptions>, PostilioOptionsValidator>();
+        return builder
             .AddTypedClient((http, provider) => new PostilioClient(http, provider.GetRequiredService<IOptionsMonitor<PostilioOptions>>().CurrentValue))
             .AddHttpMessageHandler(provider =>
             {
                 var options = provider.GetRequiredService<IOptionsMonitor<PostilioOptions>>();
                 return new RetryHandler(() => options.CurrentValue, (wait, ct) => Task.Delay(wait, ct));
             })
+            // Recycled connections, so a client held by a singleton still follows DNS changes.
+            .ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler { PooledConnectionLifetime = TimeSpan.FromMinutes(2) })
             .RedactLoggedHeaders(["Authorization"]);
     }
 
@@ -39,6 +45,7 @@ public static class PostilioServiceCollectionExtensions
     public static IHttpClientBuilder AddPostilio(this IServiceCollection services, IConfiguration configuration)
     {
         ArgumentNullException.ThrowIfNull(configuration);
+        services.AddSingleton<IOptionsChangeTokenSource<PostilioOptions>>(new ConfigurationChangeTokenSource(configuration));
         // Read by hand rather than with the configuration binder, which needs reflection.
         return services.AddPostilio(o =>
         {

@@ -35,7 +35,7 @@ public sealed class SpecTests
     {
         var operations = Spec["paths"]?.AsObject().SelectMany(p => p.Value?.AsObject() ?? []).Select(o => (string?)o.Value?["operationId"]).Order();
         var methods = typeof(PostilioClient).GetMethods(BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly)
-            .Select(m => m.Name[..^"Async".Length]).Order();
+            .Select(m => m.Name[..^"Async".Length]).Distinct().Order();
 
         Assert.Equal(operations, methods);
     }

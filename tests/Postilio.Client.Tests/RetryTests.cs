@@ -40,7 +40,7 @@ public sealed class RetryTests
             configure: r => r.Headers.RetryAfter = new System.Net.Http.Headers.RetryConditionHeaderValue(DateTimeOffset.UtcNow.AddSeconds(10)))
             .Answer(HttpStatusCode.Accepted, Sent);
 
-        await Client().SendEmailAsync(Welcome(), cancellationToken: TestContext.Current.CancellationToken);
+        await Client().SendEmailAsync(Welcome(), TestContext.Current.CancellationToken);
 
         var delay = Assert.Single(_delays);
         Assert.InRange(delay, TimeSpan.FromSeconds(8), TimeSpan.FromSeconds(10));
@@ -62,11 +62,26 @@ public sealed class RetryTests
     }
 
     [Fact]
+    public async Task TransientError_ManyRetries_NeverWaitsLongerThanTheMaximum()
+    {
+        _http.Fail().Fail().Fail().Fail().Fail().Answer(HttpStatusCode.OK, Domain);
+        var client = new PostilioClient(new PostilioOptions { ApiKey = ApiKey, MaxRetries = 5, MaxRetryDelay = TimeSpan.FromSeconds(3) }, _http, (delay, _) =>
+        {
+            _delays.Add(delay);
+            return Task.CompletedTask;
+        });
+
+        await client.GetDomainAsync(Guid.NewGuid(), TestContext.Current.CancellationToken);
+
+        Assert.Equal(TimeSpan.FromSeconds(3), _delays.Max());
+    }
+
+    [Fact]
     public async Task TransientError_SendEmail_IsRetriedWithTheSameIdempotencyKey()
     {
         _http.Fail().Answer(HttpStatusCode.BadGateway).Answer(HttpStatusCode.Accepted, Sent);
 
-        await Client().SendEmailAsync(Welcome(), cancellationToken: TestContext.Current.CancellationToken);
+        await Client().SendEmailAsync(Welcome(), TestContext.Current.CancellationToken);
 
         Assert.Equal(3, _http.Requests.Count);
         Assert.Single(_http.Requests.SelectMany(r => r.Request.Headers.GetValues("Idempotency-Key")).Distinct());

@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Net;
+using System.Reflection;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
@@ -16,7 +17,11 @@ public sealed class PostilioClient
 {
     // One connection pool for every client made without DI; recycled so DNS changes are picked up.
     private static readonly SocketsHttpHandler SharedHandler = new() { PooledConnectionLifetime = TimeSpan.FromMinutes(2) };
+    private static readonly ProductInfoHeaderValue UserAgent = new("postilio-dotnet",
+        typeof(PostilioClient).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion.Split('+')[0] ?? "0");
     private readonly HttpClient _http;
+    private readonly Uri _baseAddress;
+    private readonly string _apiKey;
 
     /// <summary>A client with this API key and the default settings.</summary>
     public PostilioClient(string apiKey)
@@ -31,16 +36,20 @@ public sealed class PostilioClient
     }
 
     /// <summary>
-    /// A client on an <see cref="HttpClient"/> you manage, such as one from <c>IHttpClientFactory</c>. It sets the
-    /// client's base address and API key; retries come from the handler that <c>AddPostilio</c> adds.
+    /// A client on an <see cref="HttpClient"/> you manage, such as one from <c>IHttpClientFactory</c>. The client is
+    /// left as it is: the address and the API key go on each request. Retries come from the handler <c>AddPostilio</c> adds.
     /// </summary>
     public PostilioClient(HttpClient httpClient, PostilioOptions options)
     {
         ArgumentNullException.ThrowIfNull(httpClient);
-        Validate(options);
-        httpClient.BaseAddress = options.BaseAddress.AbsoluteUri.EndsWith('/') ? options.BaseAddress : new Uri(options.BaseAddress.AbsoluteUri + "/");
-        httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", options.ApiKey);
+        ArgumentNullException.ThrowIfNull(options);
+        if (options.Problem() is { } problem)
+        {
+            throw new ArgumentException(problem, nameof(options));
+        }
         _http = httpClient;
+        _baseAddress = options.BaseAddress.AbsoluteUri.EndsWith('/') ? options.BaseAddress : new Uri(options.BaseAddress.AbsoluteUri + "/");
+        _apiKey = options.ApiKey;
     }
 
     internal PostilioClient(PostilioOptions options, HttpMessageHandler handler, Func<TimeSpan, CancellationToken, Task> delay)
@@ -50,14 +59,21 @@ public sealed class PostilioClient
 
     /// <summary>
     /// Sends an email: one message per recipient. Needs the <c>emails:send</c> scope. With a test key nothing is
-    /// delivered. Without <paramref name="idempotencyKey"/> the client makes one per call, so its own retries never
-    /// send twice; pass your own (an order number, say) to be safe across restarts too.
+    /// delivered. The client makes an Idempotency-Key per call, so its own retries never send twice.
     /// </summary>
-    public Task<SendEmailResponse> SendEmailAsync(SendEmailRequest request, string? idempotencyKey = null, CancellationToken cancellationToken = default)
+    public Task<SendEmailResponse> SendEmailAsync(SendEmailRequest request, CancellationToken cancellationToken = default) =>
+        SendEmailAsync(request, Guid.NewGuid().ToString(), cancellationToken);
+
+    /// <summary>
+    /// Sends an email with your own Idempotency-Key (1 to 256 characters), such as an order number: a repeat within 24
+    /// hours answers as the first request did and sends nothing, also across restarts.
+    /// </summary>
+    public Task<SendEmailResponse> SendEmailAsync(SendEmailRequest request, string idempotencyKey, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(request);
+        ArgumentException.ThrowIfNullOrEmpty(idempotencyKey);
         return SendAsync(HttpMethod.Post, "v1/emails", Json(request, PostilioJsonContext.Default.SendEmailRequest),
-            PostilioJsonContext.Default.SendEmailResponse, cancellationToken, idempotencyKey ?? Guid.NewGuid().ToString());
+            PostilioJsonContext.Default.SendEmailResponse, cancellationToken, idempotencyKey);
     }
 
     /// <summary>Gets a message and its events. Needs the <c>emails:read</c> scope; a key finds only messages of its own mode.</summary>
@@ -169,8 +185,16 @@ public sealed class PostilioClient
     private async Task<T> SendAsync<T>(HttpMethod method, string path, HttpContent? content, JsonTypeInfo<T> answer, CancellationToken cancellationToken, string? idempotencyKey = null)
     {
         using var response = await SendAsync(method, path, content, idempotencyKey, cancellationToken).ConfigureAwait(false);
-        return await response.Content.ReadFromJsonAsync(answer, cancellationToken).ConfigureAwait(false)
-            ?? throw new JsonException($"{method} /{path} answered {(int)response.StatusCode} without a body.");
+        try
+        {
+            return await response.Content.ReadFromJsonAsync(answer, cancellationToken).ConfigureAwait(false)
+                ?? throw new JsonException("The body is null.");
+        }
+        catch (JsonException e)
+        {
+            throw new PostilioException($"{method} /{path.Split('?')[0]} answered {(int)response.StatusCode} with a body that is not the expected JSON.",
+                response.StatusCode, innerException: e);
+        }
     }
 
     private async Task SendAsync(HttpMethod method, string path, HttpContent? content, CancellationToken cancellationToken)
@@ -180,7 +204,9 @@ public sealed class PostilioClient
 
     private async Task<HttpResponseMessage> SendAsync(HttpMethod method, string path, HttpContent? content, string? idempotencyKey, CancellationToken cancellationToken)
     {
-        using var request = new HttpRequestMessage(method, path) { Content = content };
+        using var request = new HttpRequestMessage(method, new Uri(_baseAddress, path)) { Content = content };
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _apiKey);
+        request.Headers.UserAgent.Add(UserAgent);
         if (idempotencyKey is not null)
         {
             request.Headers.Add(RetryHandler.IdempotencyKeyHeader, idempotencyKey);
@@ -245,16 +271,4 @@ public sealed class PostilioClient
         return present.Count == 0 ? string.Empty : "?" + string.Join('&', present);
     }
 
-    private static void Validate(PostilioOptions options)
-    {
-        ArgumentNullException.ThrowIfNull(options);
-        if (!options.ApiKey.StartsWith("pk_", StringComparison.Ordinal))
-        {
-            throw new ArgumentException("PostilioOptions.ApiKey must be an API key: pk_live_… or pk_test_….", nameof(options));
-        }
-        if (options.BaseAddress is not { IsAbsoluteUri: true })
-        {
-            throw new ArgumentException("PostilioOptions.BaseAddress must be an absolute URI.", nameof(options));
-        }
-    }
 }

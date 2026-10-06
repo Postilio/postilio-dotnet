@@ -64,7 +64,7 @@ public sealed class ContractTests
     public async Task SendEmail_InvalidRequest_ThrowsValidationPerField()
     {
         var error = await Assert.ThrowsAsync<PostilioValidationException>(() =>
-            Client().SendEmailAsync(new SendEmailRequest { From = From ?? string.Empty, To = [], Subject = "No one", Text = "Hi." }, cancellationToken: TestContext.Current.CancellationToken));
+            Client().SendEmailAsync(new SendEmailRequest { From = From ?? string.Empty, To = [], Subject = "No one", Text = "Hi." }, TestContext.Current.CancellationToken));
 
         Assert.Contains("to", error.Errors.Keys);
     }
@@ -73,7 +73,7 @@ public sealed class ContractTests
     public async Task SendEmail_UnknownSenderDomain_ThrowsUnprocessable()
     {
         var error = await Assert.ThrowsAsync<PostilioUnprocessableException>(() =>
-            Client().SendEmailAsync(new SendEmailRequest { From = "someone@not-a-domain-of-this-project.example", To = [Delivered], Subject = "Hi", Text = "Hi." }, cancellationToken: TestContext.Current.CancellationToken));
+            Client().SendEmailAsync(new SendEmailRequest { From = "someone@not-a-domain-of-this-project.example", To = [Delivered], Subject = "Hi", Text = "Hi." }, TestContext.Current.CancellationToken));
 
         Assert.Equal(PostilioErrorCodes.UnverifiedSenderDomain, error.ErrorCode);
     }
@@ -107,6 +107,8 @@ public sealed class ContractTests
     {
         Assert.SkipWhen(BaseAddress is null || ApiKey is null || From is null,
             "Set POSTILIO_CONTRACT_BASE_ADDRESS, POSTILIO_CONTRACT_API_KEY and POSTILIO_CONTRACT_FROM to run the contract tests.");
+        // A live key would deliver real mail.
+        Assert.StartsWith("pk_test_", ApiKey, StringComparison.Ordinal);
         return new PostilioClient(new PostilioOptions { ApiKey = ApiKey ?? string.Empty, BaseAddress = new Uri(BaseAddress ?? string.Empty) });
     }
 }
