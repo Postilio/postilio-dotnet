@@ -6,6 +6,29 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+Follows the current `/v1` API (OpenAPI fingerprint
+`2fff7a4df4ee17bcd470dba8475333e32cb545fd3eb7874a7dc83bdc5ef53e53`). No breaking changes: every addition is a new
+member or an optional property.
+
+### Added
+
+- `SendEmailRequest.Cc` and `Bcc` (only with exactly one `To`), and `Headers` for your own headers, such as
+  `List-Unsubscribe` and `List-Unsubscribe-Post` for one-click unsubscribe.
+- Scheduled sending: `SendEmailRequest.SendAt`, `EmailDetails.SendAt`, `CancelEmailAsync`, the statuses and webhook
+  events `scheduled` and `canceled` (`EmailStatuses`, `WebhookEventTypes`), and `WebhookEventData.SendAt`.
+- `SendTestEmailAsync` (`POST /v1/emails/test`) with `TestEmailRequest` and `TestEmailResponse`.
+- `GetUsageAsync` (`GET /v1/usage`) with `ApiUsage`, `ApiUsageOrganization`, `ApiProjectUsage` and `ApiKeyMonthUsage`.
+- `DomainResponse.Dmarc` (`DmarcCheck`): the domain's DMARC record at the last check.
+- `EmailEvent.Reason` and `WebhookEventData.Reason`, with the codes in `EmailEventReasons` (`lost_in_restore` and
+  `canceled_by_request` included).
+- Error codes in `PostilioErrorCodes`: suspended organizations and projects, the plan, project and platform limits,
+  message size (413), scheduled sending, cc/bcc, test emails and `service_degraded` (503).
+
+### Changed
+
+- An exception's `Message` ends with the API's explanation when the error answer has one (such as the size limit
+  behind a 413), instead of a full stop.
+
 ## [0.1.0-alpha.1]
 
 First version, against the alpha of the Postilio API (`/v1`, OpenAPI fingerprint
