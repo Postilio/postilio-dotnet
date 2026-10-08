@@ -17,7 +17,8 @@ public sealed class EmailEvent
 
     /// <summary>
     /// Why the attempt was delayed or failed, or why a scheduled message was canceled: see
-    /// <see cref="EmailEventReasons"/>, or for a cancel at its due time the limit's code in <see cref="PostilioErrorCodes"/>.
+    /// <see cref="EmailEventReasons"/>, or for a message canceled at its due time the code in <see cref="PostilioErrorCodes"/>
+    /// that would have refused it then, such as <c>unverified_sender_domain</c> or <c>plan_daily_limit_reached</c>.
     /// Null when there is nothing to explain. Build on this, not on <see cref="Response"/>.
     /// </summary>
     public string? Reason { get; init; }

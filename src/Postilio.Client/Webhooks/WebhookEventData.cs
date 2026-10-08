@@ -42,7 +42,7 @@ public sealed class WebhookEventData
     /// <summary>The receiving server's reply.</summary>
     public string? Response { get; init; }
 
-    /// <summary>Why it was delayed, failed or canceled; see <see cref="EmailEventReasons"/>.</summary>
+    /// <summary>Why it was delayed, failed or canceled; the same codes as <see cref="EmailEvent.Reason"/>.</summary>
     public string? Reason { get; init; }
 
     /// <summary>For a scheduled message: when it is to go out.</summary>

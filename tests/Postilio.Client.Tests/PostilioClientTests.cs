@@ -233,7 +233,8 @@ public sealed class PostilioClientTests
         Assert.IsType(expected, error);
         Assert.Equal(status, error.StatusCode);
         Assert.Equal(code, error.ErrorCode);
-        Assert.Contains($"POST /v1/domains answered {(int)status}", error.Message, StringComparison.Ordinal);
+        Assert.StartsWith($"POST /v1/domains answered {(int)status}", error.Message, StringComparison.Ordinal);
+        Assert.EndsWith(".", error.Message, StringComparison.Ordinal);
         Assert.DoesNotContain(ApiKey, error.ToString(), StringComparison.Ordinal);
     }
 

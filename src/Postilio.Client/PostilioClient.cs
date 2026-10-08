@@ -91,7 +91,8 @@ public sealed class PostilioClient
     /// <summary>
     /// Sends one test email to an address of your own: one confirmed for test emails in the project, or a member's.
     /// Needs the <c>emails:send</c> scope. A project sends a few a day (429 <c>test_mail_daily_limit_reached</c>);
-    /// otherwise it is a send like any other, and counts towards your usage.
+    /// otherwise it is a send like any other, and counts towards your usage. It takes no Idempotency-Key, so the client
+    /// does not retry it after a connection failure or a 5xx.
     /// </summary>
     public Task<TestEmailResponse> SendTestEmailAsync(TestEmailRequest request, CancellationToken cancellationToken = default)
     {

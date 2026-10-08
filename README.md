@@ -115,7 +115,9 @@ var sent = await postilio.SendEmailAsync(new SendEmailRequest
 await postilio.CancelEmailAsync(sent.Ids[0], ct); // its status becomes "canceled"
 ```
 
-Once it is on its way, cancelling throws a `PostilioConflictException` (`email_not_scheduled`). Limits and usage count
+Once it is on its way, cancelling throws a `PostilioConflictException` (`email_not_scheduled`). A test key checks
+`SendAt` but simulates the message at once, so with a test key nothing is ever `scheduled` and cancelling always throws
+that. Limits and usage count
 when it is due; a scheduled message that is not allowed then ends as `canceled`, with the reason on its event
 (`EmailEvent.Reason`, see `EmailEventReasons`).
 
@@ -186,7 +188,8 @@ The client retries, at most `MaxRetries` times (2 by default):
 - a **429** for every call, after the `Retry-After` Postilio sends. If that is longer than `MaxRetryDelay` (30 seconds by
   default), it throws at once with `RetryAfter` set, rather than blocking your request for an hour;
 - a **connection failure** or a **408, 500, 502, 503 or 504** only when sending again cannot do anything twice: a `GET`,
-  or a send, which carries an `Idempotency-Key`. Creating, changing and deleting are never retried on these.
+  or a send, which carries an `Idempotency-Key` (a test email does not). Creating, changing and deleting are never retried
+  on these.
 
 Waits grow from half a second, with some random spread, and never exceed `MaxRetryDelay`. Set `MaxRetries = 0` to turn
 retries off, for instance when you prefer your own resilience handler; do not add one on top of these retries

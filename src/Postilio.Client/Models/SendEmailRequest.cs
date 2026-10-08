@@ -53,7 +53,7 @@ public sealed class SendEmailRequest
     /// <summary>
     /// When to send it: at least a minute and at most 30 days ahead (422 <c>send_at_too_soon</c>,
     /// <c>send_at_too_far</c>). Until then it is <c>scheduled</c> and <see cref="PostilioClient.CancelEmailAsync"/>
-    /// cancels it. Null sends it at once.
+    /// cancels it. Null sends it at once. A test key checks it but simulates the message at once, so nothing waits.
     /// </summary>
     public DateTimeOffset? SendAt { get; init; }
 }
