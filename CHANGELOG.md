@@ -6,6 +6,12 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Changed
+
+- The copy of the `/v1` document follows fingerprint
+  `6b72ff75628f6b8ee9b7cd3abc65cf5be7bec0037c5e94c7e7e8350684c73ed3`: its descriptions now name the `scheduled` and
+  `canceled` webhook events and the `test_mail` value of `via`, which the client already had. No change to the client.
+
 ## [0.2.0-alpha.1] - 2026-10-08
 
 Follows the current `/v1` API (OpenAPI fingerprint
