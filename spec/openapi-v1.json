@@ -1270,7 +1270,7 @@
             "items": {
               "type": "string"
             },
-            "description": "One or more of: accepted, queued, delivered, deferred, bounced, expired, complained, suppressed.",
+            "description": "One or more of: accepted, queued, delivered, deferred, bounced, expired, complained, suppressed, scheduled, canceled.",
             "nullable": true
           },
           "description": {
@@ -1510,7 +1510,7 @@
           },
           "via": {
             "type": "string",
-            "description": "`api` or `smtp`: how the message was submitted."
+            "description": "`api`, `smtp`, or `test_mail` for a test email: how the message was submitted."
           },
           "sendAt": {
             "type": "string",
@@ -2045,7 +2045,7 @@
             "items": {
               "type": "string"
             },
-            "description": "The message events it gets: accepted, queued, delivered, deferred, bounced, expired, complained, suppressed."
+            "description": "The message events it gets: accepted, queued, delivered, deferred, bounced, expired, complained, suppressed, scheduled, canceled."
           },
           "mode": {
             "type": "string",
