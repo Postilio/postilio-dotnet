@@ -6,6 +6,8 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.2.0-alpha.1] - 2026-10-08
+
 Follows the current `/v1` API (OpenAPI fingerprint
 `2fff7a4df4ee17bcd470dba8475333e32cb545fd3eb7874a7dc83bdc5ef53e53`). No breaking changes: every addition is a new
 member or an optional property.
