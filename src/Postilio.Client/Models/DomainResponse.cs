@@ -29,4 +29,7 @@ public sealed class DomainResponse
 
     /// <summary>Live messages sent from it in the last 30 days.</summary>
     public int Sent30d { get; init; }
+
+    /// <summary>The domain's DMARC record at the last check; null before the first check.</summary>
+    public DmarcCheck? Dmarc { get; init; }
 }

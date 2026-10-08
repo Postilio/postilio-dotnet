@@ -61,6 +61,26 @@ public sealed class ContractTests
     }
 
     [Fact]
+    public async Task SendEmail_Scheduled_WaitsAndIsCanceledOnce()
+    {
+        var client = Client();
+        var sendAt = DateTimeOffset.UtcNow.AddHours(1);
+        var sent = await client.SendEmailAsync(new SendEmailRequest { From = From ?? string.Empty, To = [Delivered], Subject = "Scheduled", Text = "Never sent.", SendAt = sendAt }, TestContext.Current.CancellationToken);
+        var id = Assert.Single(sent.Ids);
+        var scheduled = await client.GetEmailAsync(id, TestContext.Current.CancellationToken);
+
+        await client.CancelEmailAsync(id, TestContext.Current.CancellationToken);
+        var canceled = await client.GetEmailAsync(id, TestContext.Current.CancellationToken);
+        var again = await Assert.ThrowsAsync<PostilioConflictException>(() => client.CancelEmailAsync(id, TestContext.Current.CancellationToken));
+
+        Assert.Equal(EmailStatuses.Scheduled, scheduled.Status);
+        Assert.Equal(sendAt.ToUnixTimeSeconds(), scheduled.SendAt?.ToUnixTimeSeconds());
+        Assert.Equal(EmailStatuses.Canceled, canceled.Status);
+        Assert.Contains(canceled.Events, e => e.Type == EmailStatuses.Canceled && e.Reason == EmailEventReasons.CanceledByRequest);
+        Assert.Equal(PostilioErrorCodes.EmailNotScheduled, again.ErrorCode);
+    }
+
+    [Fact]
     public async Task SendEmail_InvalidRequest_ThrowsValidationPerField()
     {
         var error = await Assert.ThrowsAsync<PostilioValidationException>(() =>

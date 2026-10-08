@@ -9,11 +9,18 @@ public sealed class EmailEvent
     /// <summary>When it happened.</summary>
     public DateTimeOffset OccurredAt { get; init; }
 
-    /// <summary>The receiving server's SMTP reply code, when there was one.</summary>
+    /// <summary>The receiving server's SMTP reply code; null when no server replied.</summary>
     public short? SmtpCode { get; init; }
 
-    /// <summary>The receiving server's reply.</summary>
+    /// <summary>The receiving server's reply, with addresses masked; when no server replied, a sentence that explains what happened.</summary>
     public string? Response { get; init; }
+
+    /// <summary>
+    /// Why the attempt was delayed or failed, or why a scheduled message was canceled: see
+    /// <see cref="EmailEventReasons"/>, or for a cancel at its due time the limit's code in <see cref="PostilioErrorCodes"/>.
+    /// Null when there is nothing to explain. Build on this, not on <see cref="Response"/>.
+    /// </summary>
+    public string? Reason { get; init; }
 
     /// <summary>The delivery attempt.</summary>
     public short? Attempt { get; init; }

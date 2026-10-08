@@ -6,6 +6,12 @@ public static class EmailStatuses
     /// <summary>Stored, waiting to be handed to the mail server.</summary>
     public const string Accepted = "accepted";
 
+    /// <summary>Stored, waiting for its <see cref="SendEmailRequest.SendAt"/>.</summary>
+    public const string Scheduled = "scheduled";
+
+    /// <summary>Not sent: canceled while scheduled, or no longer allowed when it was due; see <see cref="EmailEvent.Reason"/>.</summary>
+    public const string Canceled = "canceled";
+
     /// <summary>Handed to the mail server.</summary>
     public const string Queued = "queued";
 
