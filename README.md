@@ -4,13 +4,13 @@ The official .NET client for the [Postilio](https://postilio.eu) API: European t
 
 | Package | What |
 |---|---|
-| `Postilio.Client` | The API client: send email, read messages, manage domains, suppressions and webhooks, verify webhook signatures. `services.AddPostilio(...)` for dependency injection. |
+| `Postilio.Client` | The API client: send and schedule email, send test emails, read messages and usage, manage domains, suppressions and webhooks, verify webhook signatures. `services.AddPostilio(...)` for dependency injection. |
 | `Postilio.Client.AspNetCore` | Sends ASP.NET Core Identity's email (confirmation links, password resets) through Postilio. |
 
 Both target .NET 8 and .NET 10, are trimming- and native-AOT-compatible, and depend on nothing but
 `Microsoft.Extensions.Http` (and, for the second, ASP.NET Core).
 
-> Not published on NuGet yet; the API is in alpha. See [CHANGELOG.md](CHANGELOG.md).
+> A pre-release, like the API it follows (alpha). See [CHANGELOG.md](CHANGELOG.md).
 
 ## Install
 
@@ -69,6 +69,71 @@ starts, and redacts the `Authorization` header from the factory's logs: the key 
 configuration section, such as a rotated key, applies to clients resolved after the reload. It returns the
 `IHttpClientBuilder`, for your own handlers or a timeout (see [Retries](#retries)).
 
+## Cc, Bcc and your own headers
+
+Every recipient gets a message of their own. For a message that shows it went to others too, send it to one address in
+`To` and add `Cc`, `Bcc` or both; a `Bcc` address appears in no header. With more than one `To` the API answers
+`422 cc_bcc_require_single_to`. `Headers` adds up to 10 of your own, such as one-click unsubscribe:
+
+```csharp
+await postilio.SendEmailAsync(new SendEmailRequest
+{
+    From = "Acme Support <support@mail.example.com>",
+    To = ["ada.lovelace@example.com"],
+    Cc = ["account-manager@example.com"],
+    Bcc = ["archive@example.com"],
+    Subject = "Your ticket 4711",
+    Text = "Solved: the export works again.",
+    Headers = new Dictionary<string, string>
+    {
+        ["List-Unsubscribe"] = "<https://example.com/unsubscribe/3f9a1c7e>",
+        ["List-Unsubscribe-Post"] = "List-Unsubscribe=One-Click",
+        ["X-Campaign-Id"] = "october-2026",
+    },
+}, ct);
+```
+
+The answer's `Ids` follow `To`, then `Cc`, then `Bcc`. The API checks the headers (`List-Unsubscribe`,
+`List-Unsubscribe-Post`, `In-Reply-To`, `References` and `X-` ones; see the
+[sending guide](https://docs.postilio.eu/sending.html)) and answers a `PostilioValidationException` with the problem under
+`Errors["headers"]`; the client sends what you give it.
+
+## Scheduled sending
+
+Set `SendAt`, a minute to 30 days ahead, and the message waits with the status `scheduled`. Cancel it until it goes out:
+
+```csharp
+var sent = await postilio.SendEmailAsync(new SendEmailRequest
+{
+    From = "Acme <no-reply@mail.example.com>",
+    To = ["ada.lovelace@example.com"],
+    Subject = "Your trial ends tomorrow",
+    Text = "Your trial of Acme ends tomorrow at noon.",
+    SendAt = DateTimeOffset.UtcNow.AddHours(1),
+}, ct);
+
+await postilio.CancelEmailAsync(sent.Ids[0], ct); // its status becomes "canceled"
+```
+
+Once it is on its way, cancelling throws a `PostilioConflictException` (`email_not_scheduled`). A test key checks
+`SendAt` but simulates the message at once, so with a test key nothing is ever `scheduled` and cancelling always throws
+that. Limits and usage count
+when it is due; a scheduled message that is not allowed then ends as `canceled`, with the reason on its event
+(`EmailEvent.Reason`, see `EmailEventReasons`).
+
+## Test emails and usage
+
+```csharp
+// To an address a member confirmed for test emails in the portal, or a member's own; Postilio's sample message
+// unless you give a subject and a body.
+var test = await postilio.SendTestEmailAsync(new TestEmailRequest { From = "no-reply@mail.example.com", To = "ada@example.org" }, ct);
+var email = await postilio.GetEmailAsync(test.Id, ct); // Via is "test_mail"
+
+// A live key with the usage:read scope; the current month when you leave it out.
+var usage = await postilio.GetUsageAsync("2026-10", ct);
+Console.WriteLine($"{usage.Project.Billable} billable, plan {usage.Organization.Plan}: {usage.Organization.State}");
+```
+
 ## Sending safely twice: idempotency
 
 A request can time out after Postilio accepted it. `SendEmailAsync` therefore always sends an `Idempotency-Key`: one it
@@ -92,11 +157,13 @@ An error answer throws a `PostilioException`, or a subclass per status:
 | 403 | `PostilioPermissionException` |
 | 404 | `PostilioNotFoundException` |
 | 409 | `PostilioConflictException` |
+| 413 | `PostilioException`: the message is too large (`message_too_large`, `message_too_large_for_recipients`, `payload_too_large`) |
 | 422 | `PostilioUnprocessableException` |
 | 429 | `PostilioRateLimitException`, with `RetryAfter` |
-| 5xx | `PostilioServerException`, with the `TraceId` to quote to support |
+| 5xx | `PostilioServerException`, with the `TraceId` to quote to support; a 503 `service_degraded` has a `RetryAfter` |
 
-`ErrorCode` holds the API's stable code; `PostilioErrorCodes` lists them. A code may be added later, so handle one you
+`ErrorCode` holds the API's stable code; `PostilioErrorCodes` lists them. When the API explains an error in words, such as
+the limit a message crossed, the exception's `Message` ends with that explanation. A code may be added later, so handle one you
 do not know by its status:
 
 ```csharp
@@ -121,7 +188,8 @@ The client retries, at most `MaxRetries` times (2 by default):
 - a **429** for every call, after the `Retry-After` Postilio sends. If that is longer than `MaxRetryDelay` (30 seconds by
   default), it throws at once with `RetryAfter` set, rather than blocking your request for an hour;
 - a **connection failure** or a **408, 500, 502, 503 or 504** only when sending again cannot do anything twice: a `GET`,
-  or a send, which carries an `Idempotency-Key`. Creating, changing and deleting are never retried on these.
+  or a send, which carries an `Idempotency-Key` (a test email does not). Creating, changing and deleting are never retried
+  on these.
 
 Waits grow from half a second, with some random spread, and never exceed `MaxRetryDelay`. Set `MaxRetries = 0` to turn
 retries off, for instance when you prefer your own resilience handler; do not add one on top of these retries
@@ -156,8 +224,10 @@ var created = await postilio.CreateWebhookEndpointAsync(new CreateWebhookEndpoin
 // created.Secret (whsec_…) is shown this once: store it in your secret store now.
 ```
 
-Statuses, reasons and event types are strings with constants (`EmailStatuses`, `DomainStatuses`, …), since Postilio may
-add values.
+Statuses, reasons and event types are strings with constants (`EmailStatuses`, `EmailEventReasons`, `DomainStatuses`,
+…), since Postilio may add values. A domain's `Dmarc` says how its DMARC record looks at the last check (advice only:
+sending never depends on it). An endpoint gets the `scheduled` and `canceled` events only when you add them to its
+`Events`.
 
 ## Receiving webhooks
 

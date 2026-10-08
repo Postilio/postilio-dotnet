@@ -80,6 +80,33 @@ public sealed class PostilioClient
     public Task<EmailDetails> GetEmailAsync(Guid id, CancellationToken cancellationToken = default) =>
         SendAsync(HttpMethod.Get, $"v1/emails/{id}", null, PostilioJsonContext.Default.EmailDetails, cancellationToken);
 
+    /// <summary>
+    /// Cancels a message sent with <see cref="SendEmailRequest.SendAt"/> while it waits: it becomes <c>canceled</c> and
+    /// its content is deleted. Needs the <c>emails:send</c> scope. Once it is on its way, or for a message that was never
+    /// scheduled, it throws a <see cref="PostilioConflictException"/> (<c>email_not_scheduled</c>).
+    /// </summary>
+    public Task CancelEmailAsync(Guid id, CancellationToken cancellationToken = default) =>
+        SendAsync(HttpMethod.Delete, $"v1/emails/{id}", null, cancellationToken);
+
+    /// <summary>
+    /// Sends one test email to an address of your own: one confirmed for test emails in the project, or a member's.
+    /// Needs the <c>emails:send</c> scope. A project sends a few a day (429 <c>test_mail_daily_limit_reached</c>);
+    /// otherwise it is a send like any other, and counts towards your usage. It takes no Idempotency-Key, so the client
+    /// does not retry it after a connection failure or a 5xx.
+    /// </summary>
+    public Task<TestEmailResponse> SendTestEmailAsync(TestEmailRequest request, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        return SendAsync(HttpMethod.Post, "v1/emails/test", Json(request, PostilioJsonContext.Default.TestEmailRequest),
+            PostilioJsonContext.Default.TestEmailResponse, cancellationToken);
+    }
+
+    /// <summary>Gets the project's usage in a UTC month. Needs a live key with the <c>usage:read</c> scope.</summary>
+    /// <param name="month"><c>yyyy-MM</c>; the current month when null.</param>
+    /// <param name="cancellationToken">Cancels the request.</param>
+    public Task<ApiUsage> GetUsageAsync(string? month = null, CancellationToken cancellationToken = default) =>
+        SendAsync(HttpMethod.Get, "v1/usage" + Query(("month", month)), null, PostilioJsonContext.Default.ApiUsage, cancellationToken);
+
     /// <summary>Adds a sending domain; the answer lists the DNS records to create. Needs <c>domains:manage</c>.</summary>
     public Task<DomainResponse> CreateDomainAsync(CreateDomainRequest request, CancellationToken cancellationToken = default)
     {
@@ -225,11 +252,13 @@ public sealed class PostilioClient
     private static async Task<PostilioException> ErrorAsync(HttpMethod method, string path, HttpResponseMessage response, CancellationToken cancellationToken)
     {
         var body = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
-        var code = TryRead(body, PostilioJsonContext.Default.ErrorResponse)?.Error;
+        var error = TryRead(body, PostilioJsonContext.Default.ErrorResponse);
+        var code = error?.Error;
         var problem = TryRead(body, PostilioJsonContext.Default.HttpValidationProblemDetails);
         var status = response.StatusCode;
         var retryAfter = RetryHandler.RetryAfter(response);
-        var message = $"{method} /{path.Split('?')[0]} answered {(int)status}{(code is null ? string.Empty : $" ({code})")}.";
+        var message = $"{method} /{path.Split('?')[0]} answered {(int)status}{(code is null ? string.Empty : $" ({code})")}"
+            + (error?.Message is { } detail ? $": {detail}" : ".");
         return status switch
         {
             HttpStatusCode.BadRequest => new PostilioValidationException(message, problem?.Errors ?? [], problem?.TraceId),

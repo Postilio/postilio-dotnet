@@ -5,13 +5,55 @@
     "version": "1.0.0"
   },
   "paths": {
+    "/v1/usage": {
+      "get": {
+        "tags": [
+          "Usage"
+        ],
+        "summary": "Get the project's usage in a month",
+        "description": "Needs the `usage:read` scope (live keys only). The key's project in one UTC month: billable is accepted minus suppressed. `organization.state` says where the organization stands against its plan's monthly limit this month, without its numbers. `apiKey` is the calling key's own month in its current project, by the day its messages were accepted; informative, never another key's. A key moved from another project counts here from the move on.",
+        "operationId": "GetUsage",
+        "parameters": [
+          {
+            "name": "month",
+            "in": "query",
+            "description": "yyyy-MM, a UTC month; the current month when left out.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiUsage"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/emails": {
       "post": {
         "tags": [
           "Emails"
         ],
         "summary": "Send an email",
-        "description": "Needs the `emails:send` scope. Stores one message per recipient and answers 202 with their ids, in the order of `to`. A recipient on the suppression list is accepted but not sent, and listed in `suppressed`. The sender's domain must be verified. A test key (`pk_test_`) never sends: its messages get simulated events. In the sandbox, live mail goes only to the organization's members and verified domains (422 `sandbox_recipient_not_allowed`), within a daily and a per-minute limit (429 with `Retry-After`).",
+        "description": "Needs the `emails:send` scope. Stores one message per recipient and answers 202 with their ids, in the order of `to`, `cc`, `bcc`. A recipient on the suppression list is accepted but not sent, and listed in `suppressed`. The sender's domain must be verified. A test key (`pk_test_`) never sends: its messages get simulated events. In the sandbox, live mail goes only to the organization's members and verified domains (422 `sandbox_recipient_not_allowed`), within a daily and a per-minute limit (429 with `Retry-After`). A project can have a daily and a per-minute limit of its own (429 `project_daily_limit_reached`, `project_rate_limit_reached`). The organization's plan limits the month, the day and the minute (429 `plan_monthly_limit_reached`, `plan_daily_limit_reached`, `plan_rate_limit_reached`). Only live recipients that aren't suppressed count. Apart from any plan, the platform limits each key and each project per minute and each project per day (429 `platform_rate_limit_reached`, `platform_daily_limit_reached`), far above every plan's limits. A message is at most 10 MB (413 `message_too_large`) and its size times its recipients at most 25 MB (413 `message_too_large_for_recipients`); a request body over 21 MB is not read (413 `payload_too_large`). While the platform's storage is low it takes no new messages (503 `service_degraded`, with `Retry-After`). `cc` and `bcc` take only exactly one `to` (422 `cc_bcc_require_single_to`); bcc recipients appear in no header. `headers` adds up to 10 of your own (`List-Unsubscribe`, `List-Unsubscribe-Post`, `In-Reply-To`, `References`, `X-`); any other, or one that breaks a rule, answers 400 under `errors.headers`. `sendAt` schedules the message: an ISO 8601 time with `Z` or an offset, at least a minute and at most 30 days ahead (422 `send_at_too_soon`, `send_at_too_far`; without an offset 400 under `errors.sendAt`). It waits with status `scheduled` and goes out at that time; the limits count then, not now. A project holds at most 10,000 scheduled messages of 256 MB together (409 `scheduled_limit_reached`, `scheduled_size_limit_reached`). Cancel one with `DELETE /v1/emails/{id}`.",
         "operationId": "SendEmail",
         "parameters": [
           {
@@ -83,6 +125,118 @@
                 }
               }
             }
+          },
+          "413": {
+            "description": "Payload Too Large",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/emails/test": {
+      "post": {
+        "tags": [
+          "Emails"
+        ],
+        "summary": "Send a test email",
+        "description": "Needs the `emails:send` scope. Sends one test email from a verified domain to one address of your own: an address a member confirmed for test emails in the project's portal (Test mail), or a member's address; any other is refused (422 `test_recipient_not_confirmed`). Without `subject`, `text` and `html` it sends Postilio's sample message. A project sends a few test emails per UTC day (429 `test_mail_daily_limit_reached`, with `Retry-After`). Otherwise it is a send like `POST /v1/emails`: the same limits, sandbox and sizes apply and it counts towards your usage. The message is listed with `via` `test_mail`; follow it with `GET /v1/emails/{id}`.",
+        "operationId": "SendTestEmail",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TestEmailRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "description": "Accepted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TestEmailResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Payload Too Large",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         }
       }
@@ -93,7 +247,7 @@
           "Emails"
         ],
         "summary": "Get an email and its events",
-        "description": "Needs the `emails:read` scope. A test key finds only test messages and a live key only live ones; the other mode's are 404.",
+        "description": "Needs the `emails:read` scope. A test key finds only test messages and a live key only live ones; the other mode's are 404. A scheduled message shows its `sendAt`.",
         "operationId": "GetEmail",
         "parameters": [
           {
@@ -121,6 +275,43 @@
             "description": "Not Found"
           }
         }
+      },
+      "delete": {
+        "tags": [
+          "Emails"
+        ],
+        "summary": "Cancel a scheduled email",
+        "description": "Needs the `emails:send` scope. Cancels a message sent with `sendAt` while it waits: it gets status `canceled` and a `canceled` event, and its content is deleted. Once it is on its way, or for a message that was never scheduled, the answer is 409 `email_not_scheduled`. A test key finds only test messages and a live key only live ones; the other mode's are 404.",
+        "operationId": "CancelEmail",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/v1/domains": {
@@ -129,7 +320,7 @@
           "Domains"
         ],
         "summary": "Add a sending domain",
-        "description": "Needs the `domains:manage` scope. Answers the domain as `pending`, with the two CNAME records to create in its DNS. postilio.eu and names under it cannot be added. 409 `domain_exists` when the project has it already.",
+        "description": "Needs the `domains:manage` scope. Answers the domain as `pending`, with the two CNAME records to create in its DNS. postilio.eu and names under it cannot be added. 409 `domain_exists` when the project has it already, 409 `domain_limit_reached` when the organization's plan allows no more domains.",
         "operationId": "CreateDomain",
         "requestBody": {
           "content": {
@@ -516,7 +707,7 @@
           "Webhooks"
         ],
         "summary": "Add a webhook endpoint",
-        "description": "Needs the `webhooks:manage` scope. The answer holds the signing secret, the only time it is shown. At most 10 endpoints per project: 409 `webhook_endpoint_limit_reached`.",
+        "description": "Needs the `webhooks:manage` scope. The answer holds the signing secret, the only time it is shown. At most 10 endpoints per project, and as many for the organization as its plan allows: 409 `webhook_endpoint_limit_reached`.",
         "operationId": "CreateWebhookEndpoint",
         "requestBody": {
           "content": {
@@ -874,6 +1065,152 @@
   },
   "components": {
     "schemas": {
+      "ApiKeyMonthUsage": {
+        "required": [
+          "id",
+          "accepted",
+          "sent",
+          "suppressed",
+          "delivered",
+          "bounced",
+          "complained"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "The key making the call.",
+            "format": "uuid"
+          },
+          "accepted": {
+            "type": "integer",
+            "description": "Messages the key had accepted, one per recipient.",
+            "format": "int64"
+          },
+          "sent": {
+            "type": "integer",
+            "description": "Accepted minus suppressed.",
+            "format": "int64"
+          },
+          "suppressed": {
+            "type": "integer",
+            "description": "Accepted but never sent, because the address is suppressed.",
+            "format": "int64"
+          },
+          "delivered": {
+            "type": "integer",
+            "description": "Delivered now; one with a complaint after delivery counts as complained instead.",
+            "format": "int64"
+          },
+          "bounced": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "complained": {
+            "type": "integer",
+            "format": "int64"
+          }
+        },
+        "description": "The calling key in the month: its messages by the UTC day they were accepted and their status now, so a late bounce\ncounts in the month the message was accepted in. Informative; the project's numbers are what is billed."
+      },
+      "ApiProjectUsage": {
+        "required": [
+          "id",
+          "billable",
+          "accepted",
+          "suppressed",
+          "delivered",
+          "bounced",
+          "complained"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "billable": {
+            "type": "integer",
+            "description": "Accepted minus suppressed: what is billed.",
+            "format": "int64"
+          },
+          "accepted": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "suppressed": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "delivered": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "bounced": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "complained": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "ApiUsage": {
+        "required": [
+          "month",
+          "final",
+          "resetsAt",
+          "organization",
+          "project",
+          "apiKey"
+        ],
+        "type": "object",
+        "properties": {
+          "month": {
+            "type": "string",
+            "description": "yyyy-MM."
+          },
+          "final": {
+            "type": "boolean",
+            "description": "The month is closed: these numbers no longer change."
+          },
+          "resetsAt": {
+            "type": "string",
+            "description": "The start of the next month, 00:00 UTC.",
+            "format": "date-time"
+          },
+          "organization": {
+            "$ref": "#/components/schemas/ApiUsageOrganization"
+          },
+          "project": {
+            "$ref": "#/components/schemas/ApiProjectUsage"
+          },
+          "apiKey": {
+            "$ref": "#/components/schemas/ApiKeyMonthUsage"
+          }
+        },
+        "description": "The key's project in one UTC month, and where its organization stands; never the organization's own numbers."
+      },
+      "ApiUsageOrganization": {
+        "required": [
+          "plan",
+          "state"
+        ],
+        "type": "object",
+        "properties": {
+          "plan": {
+            "type": "string",
+            "description": "The code of the plan the organization has now.",
+            "nullable": true
+          },
+          "state": {
+            "type": "string",
+            "description": "As in the portal: `ok`, `warning`, `over` or `capped` for the current month, null for another one.",
+            "nullable": true
+          }
+        }
+      },
       "CreateDomainRequest": {
         "required": [
           "name"
@@ -948,6 +1285,40 @@
           }
         }
       },
+      "DmarcCheck": {
+        "required": [
+          "status",
+          "policyDomain",
+          "records",
+          "issues"
+        ],
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "description": "missing (no record), invalid (receivers ignore it), monitoring (p=none: reports only) or enforced\n    (p=quarantine or p=reject)."
+          },
+          "policyDomain": {
+            "type": "string",
+            "description": "Where the record was found: the domain itself or, for a subdomain without its own, a parent\n    domain; null while missing.",
+            "nullable": true
+          },
+          "records": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The DMARC records found there, as published."
+          },
+          "issues": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Why it is invalid: multiple_records, version (does not start with v=DMARC1), no_policy (no p= tag) or\n    syntax. Advice on a valid one: no_reports (p=none without rua=, so nobody sees the reports) or spf_strict (aspf=s: SPF\n    cannot align with the return path on bounce.&lt;domain&gt;, so DMARC rests on DKIM alone)."
+          }
+        }
+      },
       "DnsRecord": {
         "required": [
           "type",
@@ -997,7 +1368,8 @@
           "createdAt",
           "addedBy",
           "failingSince",
-          "sent30d"
+          "sent30d",
+          "dmarc"
         ],
         "type": "object",
         "properties": {
@@ -1042,6 +1414,19 @@
             "type": "integer",
             "description": "Live messages sent from it today and the 29 days before (UTC); test and suppressed ones not.",
             "format": "int32"
+          },
+          "dmarc": {
+            "oneOf": [
+              {
+                "enum": [
+                  null
+                ],
+                "nullable": true
+              },
+              {
+                "$ref": "#/components/schemas/DmarcCheck"
+              }
+            ]
           }
         }
       },
@@ -1126,6 +1511,12 @@
           "via": {
             "type": "string",
             "description": "`api` or `smtp`: how the message was submitted."
+          },
+          "sendAt": {
+            "type": "string",
+            "description": "When it is scheduled to go out (`sendAt` of the request); null when it was sent at once.",
+            "format": "date-time",
+            "nullable": true
           }
         }
       },
@@ -1147,11 +1538,13 @@
           },
           "smtpCode": {
             "type": "integer",
+            "description": "The receiving server's reply code; null when no server replied, such as when no connection could be made.",
             "format": "int16",
             "nullable": true
           },
           "response": {
             "type": "string",
+            "description": "The receiving server's reply, with addresses and IP addresses masked; when no server replied, a sentence that explains what happened.",
             "nullable": true
           },
           "attempt": {
@@ -1170,6 +1563,11 @@
           "classification": {
             "type": "string",
             "nullable": true
+          },
+          "reason": {
+            "type": "string",
+            "description": "Why the attempt was delayed or failed, as a stable code (see Delivery status in the docs), such as `tls_certificate_invalid`, `mailbox_full` or `recipient_server_temporary`; null when there is nothing to explain.",
+            "nullable": true
           }
         }
       },
@@ -1180,7 +1578,13 @@
         "type": "object",
         "properties": {
           "error": {
-            "type": "string"
+            "type": "string",
+            "description": "A stable code, such as `message_too_large`."
+          },
+          "message": {
+            "type": "string",
+            "description": "Only with some codes: a sentence for people, such as the limit that was crossed.",
+            "nullable": true
           }
         }
       },
@@ -1298,7 +1702,36 @@
             "items": {
               "$ref": "#/components/schemas/EmailAttachment"
             },
-            "description": "Optional; one with a `contentId` is inline, for `cid:` references in the HTML.",
+            "description": "Optional; one with a `contentId` is inline, for `cid:` references in the HTML. The message, attachments included, is at most 10 MB, and its size times its recipients at most 25 MB (413).",
+            "nullable": true
+          },
+          "cc": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Optional; bare addresses, only with exactly one `to` (422 `cc_bcc_require_single_to`). Every copy shows them in its Cc header, and each gets a message of its own.",
+            "nullable": true
+          },
+          "bcc": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Optional; bare addresses, only with exactly one `to`. Never in any header; each gets a message of its own. `to`, `cc` and `bcc` together hold at most 50 addresses, each once.",
+            "nullable": true
+          },
+          "headers": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "Optional; at most 10 extra headers: `List-Unsubscribe`, `List-Unsubscribe-Post`, `In-Reply-To`, `References` and `X-` headers. Values are printable ASCII, at most 900 characters; headers Postilio sets itself cannot be set (see Custom headers in the docs).",
+            "nullable": true
+          },
+          "sendAt": {
+            "type": "string",
+            "description": "Optional; when to send it, ISO 8601 with `Z` or an offset, such as `2026-11-02T09:00:00+01:00`: at least a minute and at most 30 days ahead (422 `send_at_too_soon`, `send_at_too_far`). Until then the message is `scheduled` and can be canceled with `DELETE /v1/emails/{id}`. Not over SMTP.",
             "nullable": true
           }
         }
@@ -1316,7 +1749,7 @@
               "type": "string",
               "format": "uuid"
             },
-            "description": "One message per recipient, in the order of `to`."
+            "description": "One message per recipient, in the order of `to`, then `cc`, then `bcc`."
           },
           "suppressed": {
             "type": "array",
@@ -1384,6 +1817,50 @@
           "createdAt": {
             "type": "string",
             "format": "date-time"
+          }
+        }
+      },
+      "TestEmailRequest": {
+        "required": [
+          "from",
+          "to"
+        ],
+        "type": "object",
+        "properties": {
+          "from": {
+            "type": "string",
+            "description": "An address on a verified domain of the project.",
+            "nullable": true
+          },
+          "to": {
+            "type": "string",
+            "description": "One address: confirmed for test mail in the project, or a member's of its organization.",
+            "nullable": true
+          },
+          "subject": {
+            "type": "string",
+            "description": "With `text` or `html`, your own message; without all three, Postilio's sample message.",
+            "nullable": true
+          },
+          "text": {
+            "type": "string",
+            "nullable": true
+          },
+          "html": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "TestEmailResponse": {
+        "required": [
+          "id"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
           }
         }
       },
@@ -1661,6 +2138,9 @@
     }
   ],
   "tags": [
+    {
+      "name": "Usage"
+    },
     {
       "name": "Emails"
     },

@@ -27,8 +27,11 @@ public sealed class EmailDetails
     /// <summary>True for a message sent with a test key.</summary>
     public bool Test { get; init; }
 
-    /// <summary>How it was submitted: <c>api</c> or <c>smtp</c>.</summary>
+    /// <summary>How it was submitted: <c>api</c>, <c>smtp</c>, or <c>test_mail</c> for a test email.</summary>
     public string Via { get; init; } = string.Empty;
+
+    /// <summary>When it is scheduled to go out; null when it was sent at once.</summary>
+    public DateTimeOffset? SendAt { get; init; }
 
     /// <summary>What happened to it, oldest first.</summary>
     public IReadOnlyList<EmailEvent> Events { get; init; } = [];

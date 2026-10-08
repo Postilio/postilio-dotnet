@@ -26,4 +26,13 @@ public static class WebhookEventTypes
 
     /// <summary>Not sent: the address is on the suppression list.</summary>
     public const string Suppressed = EmailStatuses.Suppressed;
+
+    /// <summary>
+    /// The message waits for its send time (<see cref="Webhooks.WebhookEventData.SendAt"/>). An endpoint made before
+    /// this event existed gets it only once you add it to its events.
+    /// </summary>
+    public const string Scheduled = EmailStatuses.Scheduled;
+
+    /// <summary>A scheduled message will not be sent; <see cref="Webhooks.WebhookEventData.Reason"/> says why.</summary>
+    public const string Canceled = EmailStatuses.Canceled;
 }

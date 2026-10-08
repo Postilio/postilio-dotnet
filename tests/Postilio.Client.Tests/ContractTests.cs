@@ -61,6 +61,17 @@ public sealed class ContractTests
     }
 
     [Fact]
+    public async Task SendEmail_TestKeyWithSendAt_IsSimulatedAtOnceSoCancelingConflicts()
+    {
+        var client = Client();
+        var sent = await client.SendEmailAsync(new SendEmailRequest { From = From ?? string.Empty, To = [Delivered], Subject = "Scheduled", Text = "Simulated at once.", SendAt = DateTimeOffset.UtcNow.AddHours(1) }, TestContext.Current.CancellationToken);
+
+        var error = await Assert.ThrowsAsync<PostilioConflictException>(() => client.CancelEmailAsync(Assert.Single(sent.Ids), TestContext.Current.CancellationToken));
+
+        Assert.Equal(PostilioErrorCodes.EmailNotScheduled, error.ErrorCode);
+    }
+
+    [Fact]
     public async Task SendEmail_InvalidRequest_ThrowsValidationPerField()
     {
         var error = await Assert.ThrowsAsync<PostilioValidationException>(() =>
