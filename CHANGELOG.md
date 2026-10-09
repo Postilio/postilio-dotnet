@@ -6,11 +6,20 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- `EmailEvent.Async`, `WebhookEventData.Async` and `EmailEventReasons.AsyncBounce`: a bounce the recipient's mail
+  server sent after delivery shows as a second `bounced` event with reason `async_bounce` and `async` true.
+
 ### Changed
 
 - The copy of the `/v1` document follows fingerprint
-  `6b72ff75628f6b8ee9b7cd3abc65cf5be7bec0037c5e94c7e7e8350684c73ed3`: its descriptions now name the `scheduled` and
-  `canceled` webhook events and the `test_mail` value of `via`, which the client already had. No change to the client.
+  `86f477f7f728d5f5416c43ad347d8912f029809998e2c79c229e26433185d0dd`. Besides `async` above, it adds the
+  `domains:read` scope: `ListDomainsAsync` and `GetDomainAsync` accept it as well as `domains:manage`, also on a test
+  key. The client sends what it sent before; only its documentation changes.
+- The previous copy (fingerprint `6b72ff75628f6b8ee9b7cd3abc65cf5be7bec0037c5e94c7e7e8350684c73ed3`) named the
+  `scheduled` and `canceled` webhook events and the `test_mail` value of `via` in its descriptions, which the client
+  already had.
 
 ## [0.2.0-alpha.1] - 2026-10-08
 

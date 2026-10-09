@@ -45,6 +45,9 @@ public sealed class WebhookEventData
     /// <summary>Why it was delayed, failed or canceled; the same codes as <see cref="EmailEvent.Reason"/>.</summary>
     public string? Reason { get; init; }
 
+    /// <summary>True for a bounce that arrived after delivery; see <see cref="EmailEvent.Async"/>.</summary>
+    public bool? Async { get; init; }
+
     /// <summary>For a scheduled message: when it is to go out.</summary>
     public DateTimeOffset? SendAt { get; init; }
 
