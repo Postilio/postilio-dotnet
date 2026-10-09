@@ -52,6 +52,12 @@ public static class EmailEventReasons
     /// <summary>A permanent problem without a more specific reason.</summary>
     public const string UnknownPermanent = "unknown_permanent";
 
+    /// <summary>
+    /// The receiving server accepted the message and later sent a bounce report: a <c>bounced</c> event after the
+    /// <c>delivered</c> one, with <see cref="EmailEvent.Async"/> true.
+    /// </summary>
+    public const string AsyncBounce = "async_bounce";
+
     /// <summary>A scheduled message you canceled.</summary>
     public const string CanceledByRequest = "canceled_by_request";
 

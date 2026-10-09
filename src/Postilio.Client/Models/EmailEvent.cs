@@ -23,6 +23,9 @@ public sealed class EmailEvent
     /// </summary>
     public string? Reason { get; init; }
 
+    /// <summary>True for a bounce that arrived after delivery (reason <see cref="EmailEventReasons.AsyncBounce"/>); null otherwise.</summary>
+    public bool? Async { get; init; }
+
     /// <summary>The delivery attempt.</summary>
     public short? Attempt { get; init; }
 

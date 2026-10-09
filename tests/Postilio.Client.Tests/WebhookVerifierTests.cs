@@ -114,5 +114,24 @@ public sealed class WebhookVerifierTests
         Assert.Equal(new DateTimeOffset(2026, 10, 9, 8, 0, 0, TimeSpan.Zero), canceled.Data.SendAt);
     }
 
+    [Fact]
+    public void Parse_BounceAfterDelivery_CarriesAsync()
+    {
+        var bounced = WebhookEvent.Parse("""
+            {
+              "type": "email.bounced.v1",
+              "timestamp": "2026-10-09T09:00:00.000+00:00",
+              "data": {
+                "emailId": "0199a7c4-5a1e-7d2b-9c41-6f3e0b8a2d17", "projectId": "0199a1b2-0000-7000-8000-000000000001",
+                "to": "ada.lovelace@example.com", "test": false, "event": "bounced", "occurredAt": "2026-10-09T09:00:00.000+00:00",
+                "reason": "async_bounce", "async": true
+              }
+            }
+            """);
+
+        Assert.Equal(EmailEventReasons.AsyncBounce, bounced.Data.Reason);
+        Assert.True(bounced.Data.Async);
+    }
+
     private static FakeTimeProvider ClockAt(long unixSeconds) => new(DateTimeOffset.FromUnixTimeSeconds(unixSeconds));
 }

@@ -115,11 +115,11 @@ public sealed class PostilioClient
             PostilioJsonContext.Default.DomainResponse, cancellationToken);
     }
 
-    /// <summary>Lists the project's sending domains. Needs <c>domains:manage</c>.</summary>
+    /// <summary>Lists the project's sending domains. Needs <c>domains:read</c> or <c>domains:manage</c>; a test key will do.</summary>
     public Task<DomainList> ListDomainsAsync(CancellationToken cancellationToken = default) =>
         SendAsync(HttpMethod.Get, "v1/domains", null, PostilioJsonContext.Default.DomainList, cancellationToken);
 
-    /// <summary>Gets a sending domain. Needs <c>domains:manage</c>.</summary>
+    /// <summary>Gets a sending domain. Needs <c>domains:read</c> or <c>domains:manage</c>; a test key will do.</summary>
     public Task<DomainResponse> GetDomainAsync(Guid id, CancellationToken cancellationToken = default) =>
         SendAsync(HttpMethod.Get, $"v1/domains/{id}", null, PostilioJsonContext.Default.DomainResponse, cancellationToken);
 

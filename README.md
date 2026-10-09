@@ -200,7 +200,8 @@ retries off, for instance when you prefer your own resilience handler; do not ad
 
 ## Domains, suppressions and webhooks
 
-These need a live key with the matching scope (`domains:manage`, `suppressions:manage`, `webhooks:manage`).
+These need a live key with the matching scope (`domains:manage`, `suppressions:manage`, `webhooks:manage`). Listing and
+getting domains needs only `domains:read` (or `domains:manage`), which a test key may carry too.
 
 ```csharp
 var domain = await postilio.CreateDomainAsync(new CreateDomainRequest { Name = "mail.example.com" });
