@@ -6,6 +6,8 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.4.0-alpha.1] - 2026-10-15
+
 ### Added
 
 - `PostilioErrorCodes.AttachmentTypeNotAllowed` (422, an executable attachment),
