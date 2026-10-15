@@ -11,6 +11,9 @@ All notable changes to this project are documented here. The format follows
 - `PostilioErrorCodes.AttachmentTypeNotAllowed` (422, an executable attachment),
   `PostilioErrorCodes.ProbationDailyLimitReached` and `PostilioErrorCodes.ProbationRateLimitReached` (429, the caps in
   the first weeks after the sandbox).
+- `DomainResponse.PlatformKey` (`PlatformKeyRecord`, null when there is none) and `PlatformKeyStatuses`: the DKIM key
+  record Postilio publishes itself, which the domain's DKIM CNAME points to, with its status (`published`,
+  `publishing`, `failed`, `manual`). A pending domain whose own records are found waits for this one.
 
 ### Changed
 
@@ -18,7 +21,8 @@ All notable changes to this project are documented here. The format follows
   `b0793fcb17cf6bead36c6e703c4d3da3a3171ba5e4076495a55c62cc950ee881`. `sendAt` of a send request is now a
   `date-time` there, as `SendEmailRequest.SendAt` already was, so the spec tests check it like every other timestamp
   instead of through an exception. Its description adds that a time without an offset is refused with a 400. The
-  client sends what it sent before.
+  client sends what it sent before. Then fingerprint
+  `cdec48841de28808b550091e583aa44c61f8e4334d72bd2066f919a87c5cf1fa`, which adds `platformKey` to domains.
 
 ## [0.3.0-alpha.1] - 2026-10-09
 

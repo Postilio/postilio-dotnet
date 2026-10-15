@@ -173,6 +173,23 @@ public sealed class PostilioClientTests
     }
 
     [Fact]
+    public async Task GetDomainAsync_PlatformKey_IsRead()
+    {
+        var id = Guid.NewGuid();
+        _http.Answer(HttpStatusCode.OK, $$$"""
+            {"id":"{{{id}}}","name":"mail.example.com","status":"pending","checkedAt":null,"records":[],
+             "createdAt":"2026-10-04T18:10:09.884+00:00","addedBy":null,"failingSince":null,"sent30d":0,"dmarc":null,
+             "platformKey":{"type":"TXT","name":"pst202610.ft6sub3lbo.dkim.postilio.eu","status":"publishing"}}
+            """);
+
+        var domain = await Client().GetDomainAsync(id, TestContext.Current.CancellationToken);
+
+        Assert.Equal("TXT", domain.PlatformKey?.Type);
+        Assert.Equal("pst202610.ft6sub3lbo.dkim.postilio.eu", domain.PlatformKey?.Name);
+        Assert.Equal(PlatformKeyStatuses.Publishing, domain.PlatformKey?.Status);
+    }
+
+    [Fact]
     public async Task UpdateWebhookEndpointAsync_FieldsLeftNull_AreNotSent()
     {
         var id = Guid.NewGuid();
