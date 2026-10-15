@@ -209,7 +209,9 @@ foreach (var record in domain.Records)
 {
     Console.WriteLine($"{record.Type} {record.Name} → {record.Value}");
 }
-await postilio.CheckDomainAsync(domain.Id); // once DNS is in place
+domain = await postilio.CheckDomainAsync(domain.Id); // once DNS is in place
+// Postilio publishes the record your DKIM CNAME points to itself; a pending domain whose own records are found waits for it
+if (domain.PlatformKey?.Status == PlatformKeyStatuses.Failed) { /* Postilio's team is on it; nothing to do on your side */ }
 
 var page = await postilio.ListSuppressionsAsync(reason: SuppressionReasons.HardBounce, limit: 100);
 while (page.Next is { } next)

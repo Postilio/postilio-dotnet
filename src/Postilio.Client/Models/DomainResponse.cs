@@ -32,4 +32,7 @@ public sealed class DomainResponse
 
     /// <summary>The domain's DMARC record at the last check; null before the first check.</summary>
     public DmarcCheck? Dmarc { get; init; }
+
+    /// <summary>The DKIM key record Postilio publishes for the domain; null when there is none.</summary>
+    public PlatformKeyRecord? PlatformKey { get; init; }
 }
