@@ -72,6 +72,9 @@ public static class PostilioErrorCodes
     /// <summary>422: the send time is more than 30 days ahead.</summary>
     public const string SendAtTooFar = "send_at_too_far";
 
+    /// <summary>422: an attachment is an executable file, such as .exe or .js; the message names it.</summary>
+    public const string AttachmentTypeNotAllowed = "attachment_type_not_allowed";
+
     /// <summary>422: cc or bcc with more than one address in to.</summary>
     public const string CcBccRequireSingleTo = "cc_bcc_require_single_to";
 
@@ -86,6 +89,12 @@ public static class PostilioErrorCodes
 
     /// <summary>429: in the sandbox, this minute's recipients are used up.</summary>
     public const string SandboxRateLimitReached = "sandbox_rate_limit_reached";
+
+    /// <summary>429: in the first weeks after the sandbox, the day's recipients are used up.</summary>
+    public const string ProbationDailyLimitReached = "probation_daily_limit_reached";
+
+    /// <summary>429: in the first weeks after the sandbox, this minute's recipients are used up.</summary>
+    public const string ProbationRateLimitReached = "probation_rate_limit_reached";
 
     /// <summary>429: the project's own limit: the day's recipients are used up.</summary>
     public const string ProjectDailyLimitReached = "project_daily_limit_reached";

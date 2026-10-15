@@ -20,8 +20,6 @@ public sealed class SpecTests
     // Error bodies are read leniently (any field may be missing), and problem details carry a traceId the spec omits.
     private static readonly HashSet<string> ErrorSchemas = ["ErrorResponse", "HttpValidationProblemDetails"];
     private static readonly HashSet<string> Extensions = ["HttpValidationProblemDetails.traceId"];
-    // A plain string in the spec, since the server needs the offset; DateTimeOffset always writes one.
-    private static readonly Dictionary<string, Type> Typed = new() { ["SendEmailRequest.sendAt"] = typeof(DateTimeOffset) };
     private static readonly NullabilityInfoContext Nullability = new();
 
     [Fact]
@@ -54,7 +52,7 @@ public sealed class SpecTests
 
         Assert.Equal(specFields.Select(f => f.Key).Order(), properties.Keys.Where(k => !Extensions.Contains($"{schema}.{k}")).Order());
         var mismatches = specFields
-            .Select(f => (Field: f.Key, Problem: Mismatch(f.Value ?? new JsonObject(), properties[f.Key], CheckNullability(schema), Typed.GetValueOrDefault($"{schema}.{f.Key}"))))
+            .Select(f => (Field: f.Key, Problem: Mismatch(f.Value ?? new JsonObject(), properties[f.Key], CheckNullability(schema))))
             .Where(m => m.Problem is not null)
             .Select(m => $"{schema}.{m.Field}: {m.Problem}");
         Assert.Empty(mismatches);
@@ -99,7 +97,7 @@ public sealed class SpecTests
         }
     }
 
-    private static string? Mismatch(JsonNode field, PropertyInfo property, bool checkNullability, Type? typed)
+    private static string? Mismatch(JsonNode field, PropertyInfo property, bool checkNullability)
     {
         var nullable = (bool?)field["nullable"] == true || field["oneOf"]?.AsArray().Any(o => (bool?)o?["nullable"] == true) == true;
         var clrNullable = Nullable.GetUnderlyingType(property.PropertyType) is not null
@@ -109,7 +107,7 @@ public sealed class SpecTests
             return $"nullable is {nullable} in the spec, {clrNullable} in {property.DeclaringType?.Name}";
         }
         var clrType = Nullable.GetUnderlyingType(property.PropertyType) ?? property.PropertyType;
-        return (typed is null ? Matches(field, clrType) : clrType == typed) ? null : $"{Describe(field)} in the spec, {clrType.Name} in {property.DeclaringType?.Name}";
+        return Matches(field, clrType) ? null : $"{Describe(field)} in the spec, {clrType.Name} in {property.DeclaringType?.Name}";
     }
 
     private static bool Matches(JsonNode field, Type clrType)
